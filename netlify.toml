@@ -1,0 +1,16 @@
+# Netlify config — static site, no build step (React compiled in-browser via Babel).
+[build]
+  publish = "."
+  command = ""
+
+# SPA-ish: the app is a single index.html; there are no client routes to rewrite,
+# but this keeps deep links pointing at the app shell.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Don't let Netlify try to bundle the /functions dir as Netlify Functions —
+# those are Firebase Cloud Functions, deployed separately with the Firebase CLI.
+[functions]
+  directory = "netlify_functions_unused"

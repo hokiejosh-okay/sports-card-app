@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1"
+    />
+    <title>CardVault — Sports Card Tracker</title>
+    <meta name="description" content="Catalog, search, and value your sports-card collection." />
+
+    <!-- PWA / home-screen install -->
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#EDECE6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0D0F13" media="(prefers-color-scheme: dark)" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="CardVault" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+    <link rel="icon" href="icons/favicon.png" />
+
+    <!-- Fonts (spec §4): Oswald, Archivo, Spline Sans Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Oswald:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="styles.css" />
+
+    <!-- Firebase (compat SDK — global `firebase`, no build step) -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+
+    <!-- React + Babel standalone -->
+    <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.25.9/babel.min.js"></script>
+  </head>
+  <body>
+    <div id="root">
+      <noscript>CardVault needs JavaScript enabled.</noscript>
+    </div>
+
+    <!-- App source (compiled in the browser by Babel; order matters) -->
+    <script type="text/babel" data-presets="react" src="data/lists.js"></script>
+    <script type="text/babel" data-presets="react" src="lib/config.js"></script>
+    <script type="text/babel" data-presets="react" src="lib/firebase.js"></script>
+    <script type="text/babel" data-presets="react" src="lib/images.js"></script>
+    <script type="text/babel" data-presets="react" src="lib/format.js"></script>
+
+    <script type="text/babel" data-presets="react" src="components/Icons.js"></script>
+    <script type="text/babel" data-presets="react" src="components/Modal.js"></script>
+    <script type="text/babel" data-presets="react" src="components/Badges.js"></script>
+    <script type="text/babel" data-presets="react" src="components/CardForm.js"></script>
+    <script type="text/babel" data-presets="react" src="components/CardTile.js"></script>
+
+    <script type="text/babel" data-presets="react" src="screens/SignIn.js"></script>
+    <script type="text/babel" data-presets="react" src="screens/Collection.js"></script>
+    <script type="text/babel" data-presets="react" src="screens/AddCard.js"></script>
+    <script type="text/babel" data-presets="react" src="screens/CardDetail.js"></script>
+    <script type="text/babel" data-presets="react" src="screens/EditCard.js"></script>
+    <script type="text/babel" data-presets="react" src="screens/Insights.js"></script>
+
+    <script type="text/babel" data-presets="react" src="app.js"></script>
+  </body>
+</html>

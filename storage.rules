@@ -1,0 +1,19 @@
+rules_version = '2';
+
+// CardVault Storage rules (spec §6).
+// Read/write only under your own users/{uid} path; image/jpeg|png only; ≤ 2 MB.
+// (Storage rules can't read Firestore, so the users/{uid} allowlist doc is
+//  enforced on the Firestore side; non-allowlisted accounts are signed out
+//  by the client immediately and can never write a card record.)
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /users/{uid}/{allPaths=**} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null
+                   && request.auth.uid == uid
+                   && request.resource.size < 2 * 1024 * 1024
+                   && request.resource.contentType.matches('image/(jpeg|png)');
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

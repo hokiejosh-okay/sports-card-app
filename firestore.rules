@@ -1,0 +1,60 @@
+rules_version = '2';
+
+// CardVault Firestore rules (spec §6).
+// A user may only touch docs where ownerId == their uid, AND only if a
+// users/{uid} allowlist doc exists (created by the admin in the console).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Allowlisted = signed in AND has a users/{uid} doc.
+    function allowlisted() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function ownsExisting() {
+      return resource.data.ownerId == request.auth.uid;
+    }
+    function ownsIncoming() {
+      return request.resource.data.ownerId == request.auth.uid;
+    }
+
+    // ---- users/{uid} — the allowlist. Managed from the Firebase console only. ----
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid; // needed for the client allowlist check
+      allow write: if false;
+    }
+
+    // ---- cards ----
+    match /cards/{cardId} {
+      function validCard(d) {
+        return d.ownerId is string
+          && d.photos.front.path is string && d.photos.front.url is string
+          && d.photos.back.path is string && d.photos.back.url is string
+          && d.player is string && d.player.size() > 0
+          && d.sport in ['baseball','basketball','football','hockey','soccer','golf','wrestling','mma-boxing','racing','other']
+          && d.graded is bool
+          && (d.graded == false || (d.grading.company is string && d.grading.grade is number));
+      }
+
+      allow read:   if allowlisted() && ownsExisting();
+      allow create: if allowlisted() && ownsIncoming() && validCard(request.resource.data);
+      allow update: if allowlisted() && ownsExisting() && ownsIncoming() && validCard(request.resource.data);
+      allow delete: if allowlisted() && ownsExisting();
+
+      // value history (written from Phase 2 on)
+      match /valueHistory/{snapId} {
+        allow read, write: if allowlisted()
+          && get(/databases/$(database)/documents/cards/$(cardId)).data.ownerId == request.auth.uid;
+      }
+    }
+
+    // ---- intake (Phase 1) — locked until that phase adds its rules ----
+    match /intake/{intakeId} {
+      allow read, write: if false;
+    }
+  }
+}
