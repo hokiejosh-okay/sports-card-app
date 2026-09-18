@@ -8,8 +8,11 @@ Built to the **Card Tracker — Build Plan v2** spec. Stack: **React (CDN + Babe
 standalone, no build step) + Firebase (Auth / Firestore / Storage / Functions) +
 Netlify**. Single user, Google sign-in, allowlisted.
 
-> **This repo currently implements Phase 0** (skeleton + collection manager).
-> Phases 1–4 (AI intake, pricing comps, insights, automation) come next.
+> **This repo implements Phase 0 + Phase 1** (skeleton + collection manager, and
+> AI intake: single-card analyze→confirm and bulk seeding with a review queue).
+> Phase 1's Cloud Function must be deployed and the `ANTHROPIC_API_KEY` secret
+> set before AI features work — see **[SETUP.md](SETUP.md) §8**.
+> Phases 2–4 (pricing comps, insights, automation) come next.
 
 ## Get it running
 

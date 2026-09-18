@@ -1,6 +1,6 @@
 {
   "name": "cardvault-functions",
-  "description": "Cloud Functions for CardVault (Phase 1+: analyzeIntake, getComps).",
+  "description": "Cloud Functions for CardVault (Phase 1: analyzeIntake; Phase 2+: getComps).",
   "type": "module",
   "engines": {
     "node": "20"
@@ -11,6 +11,7 @@
     "deploy": "firebase deploy --only functions"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.126.0",
     "firebase-admin": "^12.6.0",
     "firebase-functions": "^6.1.0"
   }
