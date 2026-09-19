@@ -383,3 +383,80 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 @media (min-width: 560px) {
   .grid { grid-template-columns: 1fr 1fr 1fr; }
 }
+
+/* ========== Phase 1: AI intake + bulk seeding ========== */
+
+/* confidence flags (spec §4: low-confidence fields get a gold check tag) */
+.check-tag {
+  display: inline-block; margin-left: 8px; vertical-align: middle;
+  background: var(--gold-soft); color: var(--accent-strong);
+  border: 1px solid var(--gold-line);
+  font-size: 10px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;
+  padding: 1px 7px; border-radius: 9px;
+}
+.field-check .input { border-color: var(--gold-line); background: color-mix(in srgb, var(--gold-soft) 45%, var(--surface)); }
+.side-warn { background: var(--gold-soft); color: var(--accent-strong); border: 1px solid var(--gold-line); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 13px; font-weight: 600; margin: 8px 0 4px; }
+
+/* small buttons */
+.btn-sm { min-height: 36px; padding: 7px 12px; font-size: 13px; }
+.btn-xs { min-height: 32px; padding: 5px 10px; font-size: 12px; border-radius: 8px; }
+.btn-swap { min-height: 34px; padding: 6px 12px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+.confirm-top { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+
+/* analyzing / spinner */
+.analyzing-state { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 40px 16px; }
+.analyzing-title { font-family: var(--font-head); font-weight: 600; font-size: 20px; }
+.spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--hairline); border-top-color: var(--accent); animation: cv-spin 0.8s linear infinite; }
+@keyframes cv-spin { to { transform: rotate(360deg); } }
+
+/* duplicate dialog */
+.modal-actions-stack { flex-direction: column; }
+.modal-actions-stack .btn { width: 100%; }
+.dup-row { display: flex; gap: 12px; align-items: center; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 16px; }
+.dup-thumb { width: 46px; height: 64px; object-fit: cover; border-radius: 6px; }
+.dup-player { font-weight: 700; }
+.dup-set { color: var(--muted); font-size: 13px; }
+.dup-qty { color: var(--accent-strong); font-size: 12px; font-weight: 700; }
+
+/* bulk: select + pair */
+.bulk-drop { display: flex; flex-direction: column; align-items: center; gap: 10px; justify-content: center; min-height: 120px; border: 2px dashed var(--hairline); border-radius: var(--radius); color: var(--muted); font-weight: 600; margin-bottom: 14px; }
+.bulk-resume { width: 100%; margin-bottom: 12px; }
+.pair-controls { display: flex; gap: 8px; margin-bottom: 12px; }
+.pair-summary { font-size: 14px; margin-bottom: 12px; }
+.pair-summary strong { color: var(--accent-strong); }
+.pair-warn { color: var(--down); font-weight: 600; }
+.strip { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.strip-compact .strip-item { width: 56px; height: 78px; }
+.strip-item { position: relative; width: 68px; height: 94px; border-radius: 8px; overflow: hidden; border: 2px solid var(--hairline); }
+.strip-item img { width: 100%; height: 100%; object-fit: cover; }
+.strip-front { border-color: var(--accent); }
+.strip-back { border-color: var(--muted); }
+.strip-skip { opacity: 0.5; }
+.strip-role { position: absolute; top: 3px; left: 3px; background: rgba(0,0,0,0.6); color: #fff; font-size: 10px; font-weight: 800; width: 16px; height: 16px; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+.strip-x { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.6); color: #fff; border: none; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; padding: 0; }
+
+/* bulk: review queue */
+.queue-head { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+.queue-progress { display: flex; flex-direction: column; gap: 4px; }
+.queue-progress-bar { height: 8px; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 6px; overflow: hidden; }
+.queue-progress-bar span { display: block; height: 100%; background: var(--accent); transition: width 0.3s ease; }
+.queue-progress-label { font-size: 12px; color: var(--muted); font-weight: 600; }
+.queue-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.queue-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.queue-row { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius-sm); padding: 8px; }
+.queue-check { border-color: var(--gold-line); }
+.queue-error { border-color: var(--down); }
+.queue-thumb { width: 40px; height: 56px; border-radius: 6px; overflow: hidden; flex-shrink: 0; background: var(--surface-2); }
+.queue-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.queue-thumb-empty { width: 100%; height: 100%; }
+.queue-main { flex: 1; text-align: left; background: transparent; border: none; padding: 0; min-width: 0; }
+.queue-main:disabled { cursor: default; }
+.queue-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue-sub { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.queue-row-actions { display: flex; gap: 4px; }
+.pill { font-size: 10px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; padding: 2px 8px; border-radius: 9px; border: 1px solid var(--hairline); }
+.pill-working { background: var(--surface-2); color: var(--muted); }
+.pill-ready { background: color-mix(in srgb, var(--up) 15%, transparent); color: var(--up); border-color: color-mix(in srgb, var(--up) 40%, transparent); }
+.pill-check { background: var(--gold-soft); color: var(--accent-strong); border-color: var(--gold-line); }
+.pill-error { background: color-mix(in srgb, var(--down) 12%, transparent); color: var(--down); border-color: color-mix(in srgb, var(--down) 40%, transparent); }

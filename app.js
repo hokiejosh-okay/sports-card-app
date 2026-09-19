@@ -131,7 +131,7 @@ function App() {
   } else if (view.name === "insights") {
     body = <CV.Insights cards={cards} />;
   } else if (view.name === "add") {
-    body = <CV.AddCard onCancel={goCollection} onSaved={goCollection} />;
+    body = <CV.AddCard cards={cards} onCancel={goCollection} onSaved={goCollection} />;
   } else if (view.name === "detail" && selectedCard) {
     body = (
       <CV.CardDetail

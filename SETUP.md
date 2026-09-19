@@ -117,6 +117,46 @@ git push -u origin main   # or your working branch
 
 ---
 
+## 8. Phase 1 — AI intake (deploy the Function) — PowerShell
+
+Phase 1 adds Claude vision. The AI runs in a **Cloud Function** (so your Anthropic
+key never touches the browser). You do this once.
+
+```powershell
+# 1. Get an Anthropic API key from https://console.anthropic.com  (Blaze plan already on from step 1).
+
+# 2. Store the key as a Functions secret (NOT in code, NOT in .env committed).
+#    Paste the key when prompted:
+firebase functions:secrets:set ANTHROPIC_API_KEY
+
+# 3. (Optional) choose the vision model — defaults to claude-opus-5.
+#    Sonnet is cheaper for bulk seeding; either is one setting, no code change:
+#    setx is not used here — set it as a Functions param via an env file if you want:
+#    echo ANTHROPIC_MODEL=claude-sonnet-5 >> functions/.env   (this file is gitignored)
+
+# 4. Install function deps and deploy everything the backend needs:
+cd functions
+npm install
+cd ..
+firebase deploy --only functions,firestore:rules,storage
+```
+
+What deploys:
+- **`analyzeIntakeOnCreate`** — auto-analyzes each new intake row server-side
+  (so a bulk batch finishes even if the phone sleeps).
+- **`analyzeIntake`** — the callable used for single-card analysis and **Retry**;
+  it enforces the allowlist, so no one but you can spend the key.
+- The updated **`firestore.rules`** (the `intake` collection) and Storage rules.
+
+Notes:
+- The functions run in **`us-central1`** (matches the Firestore location from step 2).
+  If you picked a different region for Firestore, change `region` in
+  `functions/index.js` and `CV.functions = firebase.app().functions("...")` in
+  `lib/firebase.js` to match.
+- Concurrency is capped at 3 in-flight vision calls per analyzer to stay inside
+  Anthropic rate limits and bound cost.
+- First analysis after a deploy can take a few extra seconds (cold start).
+
 ## What's built in Phase 0
 
 Google sign-in + allowlist · full `cards` data model + rules · client-side image

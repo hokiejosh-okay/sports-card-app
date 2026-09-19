@@ -52,9 +52,22 @@ service cloud.firestore {
       }
     }
 
-    // ---- intake (Phase 1) — locked until that phase adds its rules ----
+    // ---- intake (Phase 1) — the resumable AI-seeding queue (spec §5) ----
+    // A pending front/back pair awaiting Claude vision. The client creates and
+    // updates its own rows; the analyzeIntake Function (Admin SDK) bypasses
+    // these rules to write aiSuggested/aiConfidence/sideCheck/status back.
     match /intake/{intakeId} {
-      allow read, write: if false;
+      function validIntake(d) {
+        return d.ownerId is string
+          && d.photos.front.path is string && d.photos.front.url is string
+          && d.photos.back.path is string && d.photos.back.url is string
+          && d.status in ['uploaded','analyzing','ready','check','error','confirmed','discarded'];
+      }
+
+      allow read:   if allowlisted() && ownsExisting();
+      allow create: if allowlisted() && ownsIncoming() && validIntake(request.resource.data);
+      allow update: if allowlisted() && ownsExisting() && ownsIncoming() && validIntake(request.resource.data);
+      allow delete: if allowlisted() && ownsExisting();
     }
   }
 }
