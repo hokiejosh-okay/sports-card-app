@@ -70,5 +70,10 @@ window.CV = window.CV || {};
       <path key="c" d="M17 20l4-4-4-4" />,
       <path key="d" d="M21 16H7" />,
     ]),
+    External: make([
+      <path key="a" d="M14 4h6v6" />,
+      <path key="b" d="M20 4l-8.5 8.5" />,
+      <path key="c" d="M18 13.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5.5" />,
+    ]),
   };
 })();

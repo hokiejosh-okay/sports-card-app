@@ -1,6 +1,7 @@
-// screens/CardDetail.js — card detail (spec §3). Comps + graded-value + update-value
-// affordance arrive in Phase 2; here we show image flip, badges, value bar, details,
-// autosaving notes, edit, and delete.
+// screens/CardDetail.js — card detail (spec §3): image flip, badges, value bar with
+// the value-vs-paid delta, eBay sold-comps link + graded-value link row + the
+// "update value" affordance (spec §8, §11 Phase 2), details, autosaving notes,
+// edit, and delete.
 window.CV = window.CV || {};
 
 CV.CardDetail = function CardDetail(props) {
@@ -14,6 +15,13 @@ CV.CardDetail = function CardDetail(props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // "Update value" affordance (spec §11 Phase 2).
+  const [valueOpen, setValueOpen] = useState(false);
+  const [valueInput, setValueInput] = useState("");
+  const [noteInput, setNoteInput] = useState("");
+  const [savingValue, setSavingValue] = useState(false);
+  const [valueErr, setValueErr] = useState("");
+
   useEffect(() => {
     setNotes(card.notes || "");
     setSide("front");
@@ -21,6 +29,9 @@ CV.CardDetail = function CardDetail(props) {
 
   const img = card.photos && card.photos[side] ? card.photos[side].url : null;
   const isGraded = !!card.graded;
+  // eBay sold-comps deep links, built live from the card's current attributes so
+  // they stay correct even for cards saved before compsUrl existed (spec §8).
+  const comps = CV.getComps(card);
 
   async function saveNotes() {
     if ((card.notes || "") === notes) return;
@@ -42,6 +53,36 @@ CV.CardDetail = function CardDetail(props) {
     } catch (e) {
       setDeleting(false);
       alert("Delete failed: " + (e.message || e));
+    }
+  }
+
+  function openValue() {
+    const v = card.estimatedValue;
+    setValueInput(v != null && !isNaN(Number(v)) ? String(v) : "");
+    setNoteInput("");
+    setValueErr("");
+    setValueOpen(true);
+  }
+
+  async function saveValue() {
+    const raw = String(valueInput).trim();
+    const v = Number(raw);
+    if (raw === "" || isNaN(v) || v < 0) {
+      setValueErr("Enter a dollar amount of 0 or more.");
+      return;
+    }
+    setSavingValue(true);
+    setValueErr("");
+    try {
+      // One write path: bumps the card value + appends a valueHistory snapshot
+      // with valueSource "manual" (spec §5, §11). The realtime listener refreshes
+      // the detail, grid, and collection total without a reload.
+      await CV.updateCardValue(card.id, { value: v, compsUrl: comps.primaryUrl, note: noteInput });
+      setValueOpen(false);
+    } catch (e) {
+      setValueErr((e && e.message) || "Couldn't save. Check your connection and try again.");
+    } finally {
+      setSavingValue(false);
     }
   }
 
@@ -133,7 +174,35 @@ CV.CardDetail = function CardDetail(props) {
             </div>
           </div>
         </div>
-        {/* Comps + "if graded" row + update-value affordance land in Phase 2. */}
+        {/* Comps + graded-value links + update-value affordance (spec §8, §11 Phase 2) */}
+        <div className="value-tools">
+          <div className="comps-row">
+            <a className="btn btn-comps" href={comps.primaryUrl} target="_blank" rel="noopener noreferrer">
+              <CV.Icons.External size={16} /> View sold on eBay
+            </a>
+            <button className="btn btn-update-value" onClick={openValue}>
+              Update value
+            </button>
+          </div>
+
+          <div className="graded-block">
+            <div className="graded-block-head">If graded — value by grade</div>
+            <div className="graded-links">
+              {comps.gradedLinks.map((g) => (
+                <a key={g.label} className="graded-link" href={g.url} target="_blank" rel="noopener noreferrer">
+                  {g.label}
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {card.valueUpdatedAt ? (
+            <div className="value-updated">
+              Value updated {CV.fmt.date(card.valueUpdatedAt)}
+              {card.valueSource ? " · " + card.valueSource : ""}
+            </div>
+          ) : null}
+        </div>
 
         {/* Details spec list */}
         <div className="detail-section">
@@ -181,6 +250,51 @@ CV.CardDetail = function CardDetail(props) {
           />
         </div>
       </div>
+
+      <CV.Modal
+        open={valueOpen}
+        title="Update value"
+        onClose={savingValue ? function () {} : () => setValueOpen(false)}
+      >
+        <p className="modal-msg">
+          Check recent{" "}
+          <a className="inline-link" href={comps.primaryUrl} target="_blank" rel="noopener noreferrer">
+            sold comps on eBay
+          </a>
+          , then record what this card is worth today. It's saved to your value history.
+        </p>
+        <div className="field">
+          <label className="field-label">Est. value ($)</label>
+          <input
+            className="input"
+            inputMode="decimal"
+            value={valueInput}
+            autoFocus
+            onChange={(e) => setValueInput(e.target.value)}
+            placeholder="e.g. 120"
+          />
+        </div>
+        <div className="field modal-field">
+          <label className="field-label">
+            Note <span className="field-hint">optional</span>
+          </label>
+          <input
+            className="input"
+            value={noteInput}
+            onChange={(e) => setNoteInput(e.target.value)}
+            placeholder="e.g. based on 3 recent PSA 9 sales"
+          />
+        </div>
+        {valueErr ? <div className="form-error">{valueErr}</div> : null}
+        <div className="modal-actions">
+          <button className="btn btn-ghost" onClick={() => setValueOpen(false)} disabled={savingValue}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" onClick={saveValue} disabled={savingValue}>
+            {savingValue ? "Saving…" : "Save value"}
+          </button>
+        </div>
+      </CV.Modal>
 
       <CV.ConfirmDialog
         open={confirmDelete}

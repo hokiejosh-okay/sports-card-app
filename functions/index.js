@@ -13,7 +13,12 @@
 // (never hard-coded). The model is the env param ANTHROPIC_MODEL so it can be
 // retuned without a frontend deploy (spec §7).
 //
-// Phase 2 will add getComps here without restructuring.
+// Phase 2's getComps intentionally lives client-side (lib/comps.js): an eBay
+// sold-listings search URL needs no API key, so there's nothing to protect
+// behind a Function, and §8 explicitly allows building it in the browser. When
+// a paid pricing API arrives (Phase 4) its key stays server-side, so getComps
+// can move here — behind onCall + the allowlist, like analyzeIntake — without
+// touching the frontend, exactly as §8 anticipates.
 
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";

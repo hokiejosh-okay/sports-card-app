@@ -8,11 +8,15 @@ Built to the **Card Tracker — Build Plan v2** spec. Stack: **React (CDN + Babe
 standalone, no build step) + Firebase (Auth / Firestore / Storage / Functions) +
 Netlify**. Single user, Google sign-in, allowlisted.
 
-> **This repo implements Phase 0 + Phase 1** (skeleton + collection manager, and
-> AI intake: single-card analyze→confirm and bulk seeding with a review queue).
+> **This repo implements Phase 0 + Phase 1 + Phase 2** (skeleton + collection
+> manager; AI intake: single-card analyze→confirm and bulk seeding with a review
+> queue; and pricing: eBay sold-comps deep links, a graded-value link row, and
+> manual value entry that writes value history).
 > Phase 1's Cloud Function must be deployed and the `ANTHROPIC_API_KEY` secret
-> set before AI features work — see **[SETUP.md](SETUP.md) §8**.
-> Phases 2–4 (pricing comps, insights, automation) come next.
+> set before AI features work — see **[SETUP.md](SETUP.md) §8**. Phase 2 is
+> pure frontend (comps are client-side eBay deep links, per spec §8) — no
+> extra deploy beyond pushing the static files.
+> Phases 3–4 (insights, automation) come next.
 
 ## Get it running
 
@@ -39,6 +43,7 @@ lib/
   firebase.js         # init + data-access helpers (auth, cards, storage)
   images.js           # client-side resize (1600px) + 400px thumbnail
   format.js           # display/model helpers
+  comps.js            # eBay sold-comps deep links (getComps) — Phase 2
 components/
   Icons.js Modal.js Badges.js CardTile.js
   CardForm.js         # THE card form + THE validation + THE save path (Add & Edit share it)
@@ -67,8 +72,22 @@ search/filter/sort happens in memory (spec §6).
 | Light/dark match §4 tokens; gold only on value + primary actions | `styles.css` |
 | iOS "Add to Home Screen" launches standalone with icon | `manifest.webmanifest` + apple meta tags in `index.html` + `icons/` |
 
+## Phase 2 — "Done when" (spec §11) and how it's met
+
+| Criterion | Where |
+|---|---|
+| Every card's comps link opens eBay (signed in) on a sold-listings search whose query contains year, brand, set, player, card #, and the parallel/subset/grade when present | `lib/comps.js` (`CV.getComps`/`CV.comps` build the `_nkw=…&_sacat=212&LH_Sold=1&LH_Complete=1&_sop=13` URL) + "View sold on eBay" in `screens/CardDetail.js` |
+| The graded row opens the same search with each grade appended | `CV.comps.gradedLinks` (PSA 10 / PSA 9 / BGS 9.5 / SGC 10, plus the card's own grade) → the "If graded" link row in `CardDetail.js` |
+| Entering a value updates the card, the grid, the collection total, and adds a valueHistory snapshot; the delta chip is green/red/absent correctly | `CV.updateCardValue` (batched card update + `valueHistory` snapshot, `valueSource:"manual"`) in `lib/firebase.js`; realtime listener in `app.js` refreshes grid/total; delta chip in `CardDetail.js` |
+| Changing parallel or grade on Edit regenerates compsUrl | `assemble()` in `components/CardForm.js` rebuilds `compsUrl` via `CV.comps.primaryUrl(data)` on every save |
+
+Value entered on the **Add/Edit form** also sets `valueSource:"manual"` + `valueUpdatedAt`
+and appends a `valueHistory` snapshot (spec §5), so history captures form saves and the
+detail affordance alike.
+
 ## Data model
 
 See spec §5. `cards/{cardId}` holds typed, queryable fields; categorical fields
 use the controlled lists in `data/lists.js` and are validated in the rules.
-Currency is USD throughout.
+Currency is USD throughout. Value changes append a `cards/{cardId}/valueHistory`
+snapshot `{ date, value, source }` (spec §5) — the series Phase 3's charts read.

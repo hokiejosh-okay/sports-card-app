@@ -146,13 +146,15 @@ function assemble(form, uid, photos, ai) {
     valueSource: estimatedValue != null ? "manual" : null,
     valueUpdatedAt: estimatedValue != null ? CV.serverTimestamp() : null,
     gradedValueEstimates: {},
-    compsUrl: null,
     // Provenance from the vision pass (spec §5) — the untouched suggestion and
     // its per-field confidence, so corrections can be measured later.
     aiSuggested: ai && ai.aiSuggested ? ai.aiSuggested : null,
     aiConfidence: ai && ai.aiConfidence ? ai.aiConfidence : null,
     notes: form.notes || "",
   };
+  // Deep link to eBay sold comps, rebuilt from the card's attributes on every
+  // save so it always reflects the current parallel/grade (spec §8, §11 Phase 2).
+  data.compsUrl = CV.comps.primaryUrl(data);
   return data;
 }
 
@@ -181,12 +183,35 @@ CV.saveCardFromForm = async function (mode, existingCard, form, photos, opts) {
   }
 
   const data = assemble(form, uid, photos, opts.ai);
+
+  // Value-change bookkeeping (spec §5, §11 Phase 2): a valueHistory snapshot is
+  // written on create-with-value and on any edit that changes the value; on an
+  // edit that leaves the value untouched we don't bump valueSource/valueUpdatedAt.
+  const norm = (v) => (v === "" || v == null || isNaN(Number(v)) ? null : Number(v));
+  const newValue = norm(data.estimatedValue);
+  const prevValue = mode === "edit" && existingCard ? norm(existingCard.estimatedValue) : null;
+  const valueChanged = mode === "edit" ? newValue !== prevValue : newValue != null;
+  if (mode === "edit" && !valueChanged) {
+    delete data.valueSource;
+    delete data.valueUpdatedAt;
+  }
+
   if (mode === "edit") {
     // Don't stomp createdAt on edit.
     await CV.updateCard(cardId, data);
   } else {
     await CV.createCard(cardId, data);
   }
+
+  // History is supplemental — never fail the save if the snapshot write hiccups.
+  if (valueChanged && newValue != null) {
+    try {
+      await CV.appendValueSnapshot(cardId, { value: newValue, source: "manual", compsUrl: data.compsUrl });
+    } catch (e) {
+      console.error("valueHistory snapshot failed (card saved):", e);
+    }
+  }
+
   return Object.assign({ id: cardId }, data);
 };
 
@@ -206,6 +231,14 @@ CV.saveCardFromAI = async function (row) {
   if (!v.ok) throw new Error("needs-review");
   const data = assemble(form, uid, photos, { aiSuggested: row.aiSuggested, aiConfidence: row.aiConfidence });
   await CV.createCard(row.id, data);
+  // Seed value history if the intake carried a value (spec §5, §11 Phase 2).
+  if (data.estimatedValue != null && !isNaN(Number(data.estimatedValue))) {
+    try {
+      await CV.appendValueSnapshot(row.id, { value: Number(data.estimatedValue), source: "manual", compsUrl: data.compsUrl });
+    } catch (e) {
+      console.error("valueHistory snapshot failed (card saved):", e);
+    }
+  }
   return Object.assign({ id: row.id }, data);
 };
 
@@ -495,7 +528,7 @@ CV.CardForm = function CardForm(props) {
           <Field label="Source">
             <input className="input" value={form.source} onChange={(e) => set("source", e.target.value)} placeholder="e.g. eBay, card show" />
           </Field>
-          <Field label="Est. value ($)" hint="comps come in Phase 2">
+          <Field label="Est. value ($)" hint="your estimate from comps">
             <input className="input" inputMode="decimal" value={form.estimatedValue} onChange={(e) => set("estimatedValue", e.target.value)} placeholder="optional" />
           </Field>
         </div>
