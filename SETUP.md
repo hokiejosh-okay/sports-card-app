@@ -165,8 +165,12 @@ in-memory search/filter/sort · card detail with slab treatment, value-vs-paid
 delta, autosaving notes, and delete · edit-any-field screen · light/dark themes ·
 installable web manifest.
 
-**Not yet (later phases):** AI auto-fill + bulk intake (Phase 1), eBay comps +
-value history (Phase 2), Insights + charts + CSV (Phase 3), automated pricing
+Phase 1 (AI auto-fill + bulk intake) and Phase 2 (eBay sold-comps deep links,
+graded-value link row, manual value entry + value history) are also built.
+Phase 2 is frontend-only — the comps links are client-side eBay URLs (spec §8),
+so no backend deploy is needed beyond the static files.
+
+**Not yet (later phases):** Insights + charts + CSV (Phase 3), automated pricing
 (Phase 4).
 
 See `README.md` for the Phase 0 "Done when" checklist and how each item was met.
