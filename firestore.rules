@@ -61,7 +61,10 @@ service cloud.firestore {
         return d.ownerId is string
           && d.photos.front.path is string && d.photos.front.url is string
           && d.photos.back.path is string && d.photos.back.url is string
-          && d.status in ['uploaded','analyzing','ready','check','error','confirmed','discarded'];
+          && d.status in ['uploaded','analyzing','ready','check','error','confirmed','discarded']
+          // Optional marker set by the re-analyze flow (transient row that copies
+          // an existing card's photos). When present it must be a string.
+          && (!('reanalyzeOf' in d) || d.reanalyzeOf is string);
       }
 
       allow read:   if allowlisted() && ownsExisting();

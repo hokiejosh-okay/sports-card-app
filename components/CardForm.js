@@ -308,7 +308,10 @@ CV.CardForm = function CardForm(props) {
       return;
     }
     // Duplicate detection on save (spec §2, §14) — a suggestion, never a block.
-    if (mode === "add" && props.cards) {
+    // Skipped on the re-analyze path (saveOpts.skipDuplicateCheck): it edits an
+    // existing card, so it must not offer to merge into another record.
+    const skipDup = !!(props.saveOpts && props.saveOpts.skipDuplicateCheck);
+    if (mode === "add" && !skipDup && props.cards) {
       const candidate = {
         id: props.saveOpts && props.saveOpts.cardId,
         year: form.year !== "" && !isNaN(Number(form.year)) ? Number(form.year) : null,

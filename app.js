@@ -86,12 +86,20 @@ function App() {
     setSelectedId(card.id);
     setView({ name: "edit" });
   };
+  const reanalyzeCard = (card) => {
+    setSelectedId(card.id);
+    setView({ name: "reanalyze" });
+  };
 
   const selectedCard = selectedId ? cards.find((c) => c.id === selectedId) : null;
 
   // If a selected card vanished (deleted elsewhere), bail to collection.
   useEffect(() => {
-    if ((view.name === "detail" || view.name === "edit") && cardsLoaded && !selectedCard) {
+    if (
+      (view.name === "detail" || view.name === "edit" || view.name === "reanalyze") &&
+      cardsLoaded &&
+      !selectedCard
+    ) {
       goCollection();
     }
   }, [view.name, selectedCard, cardsLoaded]);
@@ -138,7 +146,17 @@ function App() {
         card={selectedCard}
         onBack={goCollection}
         onEdit={editCard}
+        onReanalyze={reanalyzeCard}
         onDeleted={goCollection}
+      />
+    );
+  } else if (view.name === "reanalyze" && selectedCard) {
+    body = (
+      <CV.ReanalyzeCard
+        card={selectedCard}
+        cards={cards}
+        onCancel={() => setView({ name: "detail" })}
+        onSaved={() => setView({ name: "detail" })}
       />
     );
   } else if (view.name === "edit" && selectedCard) {

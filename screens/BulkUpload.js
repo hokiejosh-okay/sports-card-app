@@ -39,7 +39,10 @@ CV.BulkUpload = function BulkUpload(props) {
       uid,
       (all) => {
         const active = all
-          .filter((r) => BULK_ACTIVE.indexOf(r.status) >= 0)
+          // Exclude transient re-analyze rows (reanalyzeOf set): they copy an
+          // existing card's photo paths, so confirming one here would create a
+          // phantom card and Skip would delete the real card's images.
+          .filter((r) => BULK_ACTIVE.indexOf(r.status) >= 0 && !r.reanalyzeOf)
           .sort((a, b) => tsms(a.createdAt) - tsms(b.createdAt) || (a.sequence || 0) - (b.sequence || 0));
         setRows(active);
         if (!bootRef.current) {

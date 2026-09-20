@@ -332,6 +332,14 @@ img { max-width: 100%; display: block; }
 }
 .graded-link:active { background: var(--gold-line); }
 .value-updated { color: var(--muted); font-size: 12px; text-align: right; }
+
+/* "Analyze with AI" on card detail — neutral secondary action, never gold. */
+.detail-ai { display: flex; }
+.btn-analyze {
+  flex: 1;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  text-align: center;
+}
 .inline-link { color: var(--accent-strong); font-weight: 600; }
 .modal-field { margin-top: 12px; }
 
