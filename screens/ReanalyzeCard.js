@@ -196,6 +196,15 @@ function ReanalyzeConfirm(props) {
   const merged = CV.ai.fillEmpty(props.card, intake.aiSuggested || {});
   const confidence = CV.ai.scopedConfidence(merged.filled, intake.aiConfidence);
 
+  // Only attach fresh vision provenance when this pass actually produced some.
+  // On an analyze error or "Enter details by hand" there is no aiSuggested, so
+  // we omit `ai` entirely — the save path then leaves the card's existing
+  // aiSuggested/aiConfidence untouched instead of nulling it.
+  const saveOpts = { skipDuplicateCheck: true };
+  if (intake.aiSuggested) {
+    saveOpts.ai = { aiSuggested: intake.aiSuggested, aiConfidence: intake.aiConfidence };
+  }
+
   return (
     <div className="add-body">
       {intake.status === "error" ? (
@@ -215,11 +224,8 @@ function ReanalyzeConfirm(props) {
         mode="edit"
         initial={merged.card}
         confidence={confidence}
-        sideCheck={intake.sideCheck}
-        saveOpts={{
-          skipDuplicateCheck: true,
-          ai: { aiSuggested: intake.aiSuggested, aiConfidence: intake.aiConfidence },
-        }}
+        sideCheck={null}
+        saveOpts={saveOpts}
         onCancel={props.onCancel}
         onSaved={props.onSaved}
       />
