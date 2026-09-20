@@ -253,6 +253,41 @@ CV.saveCardFromAI = async function (row) {
   return Object.assign({ id: row.id }, data);
 };
 
+// ---- headless apply of a re-analyze result to an EXISTING card -------------
+// The bulk re-analyze auto-apply path (screens/ReanalyzeBulk.js). Mirrors the
+// PR #3 confirm-save contract but runs with no UI: strict "only fill empty"
+// merge (CV.ai.fillEmpty) → assemble the full card doc → CV.updateCard, ALWAYS
+// writing fresh AI provenance (aiSuggested/aiConfidence) so the card leaves the
+// "un-analyzed" set even when the merge filled nothing. NO duplicate detection
+// and NO new-card creation (that is CV.saveCardFromAI's job — never use it for
+// an existing card). Throws "needs-review" if the merged card fails validation,
+// so the caller can leave the row in the review queue instead of dropping it.
+// Re-analyze never fills a money field, so value bookkeeping is left untouched
+// (valueSource/valueUpdatedAt dropped, no valueHistory snapshot) — value writes
+// stay on the CV.updateCardValue / CV.saveCardFromForm path (spec §5).
+CV.saveReanalyzeFromAI = async function (card, row) {
+  const uid = CV.auth.currentUser.uid;
+  const merged = CV.ai.fillEmpty(card, (row && row.aiSuggested) || {});
+  const form = formFromCard(merged.card);
+  const p = (card && card.photos) || {};
+  const photos = {
+    front: Object.assign({}, p.front, { stored: p.front, dirty: false }),
+    back: Object.assign({}, p.back, { stored: p.back, dirty: false }),
+  };
+  const v = CV.validateCard(form, photos);
+  if (!v.ok) throw new Error("needs-review");
+  const data = assemble(form, uid, photos, {
+    aiSuggested: row.aiSuggested,
+    aiConfidence: row.aiConfidence,
+  });
+  // The value is unchanged on a re-analyze; don't rewrite the value provenance
+  // or append a history snapshot.
+  delete data.valueSource;
+  delete data.valueUpdatedAt;
+  await CV.updateCard(card.id, data);
+  return Object.assign({ id: card.id }, data);
+};
+
 // ---- the component ---------------------------------------------------------
 CV.CardForm = function CardForm(props) {
   const mode = props.mode || "add";

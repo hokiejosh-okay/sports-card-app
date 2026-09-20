@@ -90,6 +90,9 @@ function App() {
     setSelectedId(card.id);
     setView({ name: "reanalyze" });
   };
+  // "Analyze all" from the Collection banner → the bulk re-analyze flow, which
+  // creates the batch on entry (start:true). Re-entry is deduped in the screen.
+  const goReanalyzeBulk = () => setView({ name: "reanalyzeBulk", start: true });
 
   const selectedCard = selectedId ? cards.find((c) => c.id === selectedId) : null;
 
@@ -132,8 +135,18 @@ function App() {
         cards={cards}
         onOpen={openCard}
         onAdd={goAdd}
+        onBulkReanalyze={goReanalyzeBulk}
         onToggleTheme={toggleTheme}
         theme={theme}
+      />
+    );
+  } else if (view.name === "reanalyzeBulk") {
+    body = (
+      <CV.ReanalyzeBulk
+        cards={cards}
+        cardsLoaded={cardsLoaded}
+        start={!!view.start}
+        onDone={goCollection}
       />
     );
   } else if (view.name === "insights") {
