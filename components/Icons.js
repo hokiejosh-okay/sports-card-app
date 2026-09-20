@@ -75,5 +75,10 @@ window.CV = window.CV || {};
       <path key="b" d="M20 4l-8.5 8.5" />,
       <path key="c" d="M18 13.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5.5" />,
     ]),
+    // Sparkle — the "Analyze with AI" affordance. Neutral (currentColor), never gold.
+    Sparkle: make([
+      <path key="a" d="M12 3l1.7 4.9L18.6 10l-4.9 1.7L12 17l-1.7-5.3L5.4 10l4.9-1.7Z" />,
+      <path key="b" d="M18.5 14.5l.6 1.8 1.8.6-1.8.6-.6 1.8-.6-1.8-1.8-.6 1.8-.6Z" />,
+    ]),
   };
 })();

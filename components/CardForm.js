@@ -196,6 +196,17 @@ CV.saveCardFromForm = async function (mode, existingCard, form, photos, opts) {
     delete data.valueUpdatedAt;
   }
 
+  // Provenance: when an edit carries no fresh vision result (opts.ai omitted),
+  // leave the card's existing aiSuggested/aiConfidence as they are. assemble()
+  // defaults both to null when no ai is passed, and updateCard is a partial
+  // update, so dropping the keys here preserves the stored values rather than
+  // clearing them. When opts.ai IS passed (single-add, bulk, and the re-analyze
+  // success path) the new provenance is written as before. Create is untouched.
+  if (mode === "edit" && !opts.ai) {
+    delete data.aiSuggested;
+    delete data.aiConfidence;
+  }
+
   if (mode === "edit") {
     // Don't stomp createdAt on edit.
     await CV.updateCard(cardId, data);
@@ -308,7 +319,10 @@ CV.CardForm = function CardForm(props) {
       return;
     }
     // Duplicate detection on save (spec §2, §14) — a suggestion, never a block.
-    if (mode === "add" && props.cards) {
+    // Skipped on the re-analyze path (saveOpts.skipDuplicateCheck): it edits an
+    // existing card, so it must not offer to merge into another record.
+    const skipDup = !!(props.saveOpts && props.saveOpts.skipDuplicateCheck);
+    if (mode === "add" && !skipDup && props.cards) {
       const candidate = {
         id: props.saveOpts && props.saveOpts.cardId,
         year: form.year !== "" && !isNaN(Number(form.year)) ? Number(form.year) : null,

@@ -204,6 +204,14 @@ CV.CardDetail = function CardDetail(props) {
           ) : null}
         </div>
 
+        {/* Re-analyze: run Claude vision on the card's existing photos to fill any
+            still-empty identity fields. Neutral action (never gold). */}
+        <div className="detail-ai">
+          <button className="btn btn-analyze" onClick={() => props.onReanalyze && props.onReanalyze(card)}>
+            <CV.Icons.Sparkle size={16} /> Analyze with AI
+          </button>
+        </div>
+
         {/* Details spec list */}
         <div className="detail-section">
           <div className="section-head">Details</div>
