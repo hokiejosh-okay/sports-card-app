@@ -55,6 +55,9 @@ CV.Collection = function Collection(props) {
   }, [cards, query, sport, gradedOnly, sort]);
 
   const totals = CV.fmt.collectionTotals(cards);
+  // 30-day header delta from the loaded value histories (spec §5, Phase 3). The
+  // chip is hidden when there isn't enough history to anchor a meaningful prior.
+  const delta30 = CV.fmt.collectionDelta(cards, props.histories, 30);
 
   return (
     <div className="screen collection">
@@ -69,7 +72,15 @@ CV.Collection = function Collection(props) {
         <div className="home-total">{CV.fmt.money(totals.total)}</div>
         <div className="home-sub">
           {totals.count} card{totals.count === 1 ? "" : "s"} · {totals.valued} of {totals.count} valued
-          {/* 30-day delta hidden before Phase 3 */}
+          {delta30.hasPrior ? (
+            <span
+              className={"delta-chip home-delta " + (delta30.delta >= 0 ? "delta-up" : "delta-down")}
+              title="Change over the last 30 days"
+            >
+              {delta30.delta >= 0 ? "▲ " : "▼ "}
+              {CV.fmt.money(Math.abs(delta30.delta))} · 30d
+            </span>
+          ) : null}
         </div>
       </header>
 

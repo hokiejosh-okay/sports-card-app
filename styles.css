@@ -535,3 +535,56 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 .pill-ready { background: color-mix(in srgb, var(--up) 15%, transparent); color: var(--up); border-color: color-mix(in srgb, var(--up) 40%, transparent); }
 .pill-check { background: var(--gold-soft); color: var(--accent-strong); border-color: var(--gold-line); }
 .pill-error { background: color-mix(in srgb, var(--down) 12%, transparent); color: var(--down); border-color: color-mix(in srgb, var(--down) 40%, transparent); }
+
+/* ========== Phase 3: Insights (value tracking + charts + CSV) ========== */
+
+/* 30-day delta chip in the Collection header (reuses .delta-chip colors). */
+.home-delta { display: inline-block; margin-left: 8px; vertical-align: middle; }
+
+/* Card-detail value sparkline — sits under the est. value, gold value line. */
+.value-spark { margin-top: 6px; height: 34px; }
+.spark { display: block; }
+.spark-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.spark-dot { fill: var(--accent); }
+
+/* Insights headline stats */
+.insights-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0 4px; }
+.stat-card { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 4px; }
+.stat-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-value { font-family: var(--font-head); font-weight: 600; font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--ink); }
+.stat-money { color: var(--accent); }   /* money → gold */
+.stat-up { color: var(--up); }
+.stat-down { color: var(--down); }
+.stat-note { color: var(--muted); font-size: 12px; }
+
+/* Insights sections */
+.insights-section { margin-top: 20px; }
+.insights-section .section-head { font-family: var(--font-head); font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 10px; }
+.chart-wrap { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius); padding: 14px 12px; }
+.chart-empty { background: var(--surface); border: 1px dashed var(--hairline); border-radius: var(--radius); padding: 18px; color: var(--muted); font-size: 13px; text-align: center; }
+
+/* Best mover row */
+.best-mover { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius); padding: 14px; color: var(--ink); }
+.best-mover:active { background: var(--surface-2); }
+.best-mover-main { min-width: 0; }
+.best-mover-player { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.best-mover-set { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Line chart (gold value line + soft gold fill; muted axes/grid) */
+.linechart { display: block; max-width: 560px; margin: 0 auto; }
+.chart-grid { stroke: var(--hairline); stroke-width: 1; }
+.chart-axis { fill: var(--muted); font-family: var(--font-mono); font-size: 10px; }
+.chart-area { fill: var(--accent); fill-opacity: 0.12; stroke: none; }
+.chart-line { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.chart-dot { fill: var(--accent); }
+
+/* Bar breakdown (neutral bars — never gold) */
+.barchart { display: block; max-width: 560px; margin: 0 auto; }
+.chart-bar-label { fill: var(--ink); font-family: var(--font-body); font-size: 12px; font-weight: 600; }
+.chart-bar-track { fill: var(--surface-2); }
+.chart-bar-fill { fill: var(--ink); fill-opacity: 0.72; }
+.chart-bar-value { fill: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+
+/* CSV export — the screen's primary action */
+.insights-export { margin: 26px 0 10px; display: flex; flex-direction: column; gap: 8px; align-items: center; text-align: center; }
+.insights-export .btn { width: 100%; max-width: 340px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }

@@ -96,6 +96,10 @@ CV.CardDetail = function CardDetail(props) {
   const hasDelta = value != null && !isNaN(Number(value)) && paid != null && !isNaN(Number(paid));
   const delta = hasDelta ? Number(value) - Number(paid) : 0;
 
+  // Value sparkline (spec §5, Phase 3): only when the card has ≥2 snapshots.
+  const history = props.history || [];
+  const showSpark = history.length >= 2;
+
   return (
     <div className="screen detail">
       <header className="sub-header">
@@ -169,6 +173,11 @@ CV.CardDetail = function CardDetail(props) {
           <div className="value-main">
             <div className="value-label">Est. value</div>
             <div className="value-amount">{CV.fmt.money(value)}</div>
+            {showSpark ? (
+              <div className="value-spark" aria-hidden="false">
+                <CV.Charts.Sparkline points={history} />
+              </div>
+            ) : null}
           </div>
           <div className="value-side">
             {hasDelta ? (
