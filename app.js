@@ -8,6 +8,7 @@ function App() {
   const [uid, setUid] = useState(null);
   const [cards, setCards] = useState([]);
   const [cardsLoaded, setCardsLoaded] = useState(false);
+  const [histories, setHistories] = useState({}); // { cardId -> [{date, value, source}] }
   const [view, setView] = useState({ name: "collection" });
   const [selectedId, setSelectedId] = useState(null);
   const [theme, setTheme] = useState(getInitialTheme());
@@ -46,6 +47,7 @@ function App() {
         setUid(null);
         setCards([]);
         setCardsLoaded(false);
+        setHistories({});
         setAuthState(deniedRef.current ? "denied" : "signedout");
       }
     });
@@ -94,6 +96,36 @@ function App() {
   // creates the batch on entry (start:true). Re-entry is deduped in the screen.
   const goReanalyzeBulk = () => setView({ name: "reanalyzeBulk", start: true });
 
+  // Value histories: a one-time (non-realtime) bulk read of each card's
+  // valueHistory subcollection, held in state and passed down to Collection,
+  // Insights and CardDetail (spec §5, Phase 3). We re-read only when a value
+  // write changes the signature below — a card's valueUpdatedAt, or the set of
+  // cards (add/delete). Notes-only or other edits don't change it, so they don't
+  // trigger a re-read and keep the reads cheap.
+  const valueSig = React.useMemo(
+    () =>
+      cards
+        .map((c) => c.id + ":" + tsMillis(c.valueUpdatedAt) + ":" + tsMillis(c.createdAt))
+        .sort()
+        .join("|"),
+    [cards]
+  );
+  useEffect(() => {
+    if (authState !== "in" || !uid || !cardsLoaded) return;
+    let cancelled = false;
+    CV.fetchValueHistories(uid, cards).then(
+      (map) => {
+        if (!cancelled) setHistories(map);
+      },
+      () => {}
+    );
+    return () => {
+      cancelled = true;
+    };
+    // cards is intentionally read through valueSig, which changes exactly when a
+    // re-read is warranted.
+  }, [valueSig, cardsLoaded, uid, authState]);
+
   const selectedCard = selectedId ? cards.find((c) => c.id === selectedId) : null;
 
   // If a selected card vanished (deleted elsewhere), bail to collection.
@@ -133,6 +165,7 @@ function App() {
     body = (
       <CV.Collection
         cards={cards}
+        histories={histories}
         onOpen={openCard}
         onAdd={goAdd}
         onBulkReanalyze={goReanalyzeBulk}
@@ -150,13 +183,14 @@ function App() {
       />
     );
   } else if (view.name === "insights") {
-    body = <CV.Insights cards={cards} />;
+    body = <CV.Insights cards={cards} histories={histories} onOpen={openCard} />;
   } else if (view.name === "add") {
     body = <CV.AddCard cards={cards} onCancel={goCollection} onSaved={goCollection} />;
   } else if (view.name === "detail" && selectedCard) {
     body = (
       <CV.CardDetail
         card={selectedCard}
+        history={histories[selectedCard.id] || []}
         onBack={goCollection}
         onEdit={editCard}
         onReanalyze={reanalyzeCard}
@@ -246,6 +280,17 @@ function getInitialTheme() {
 }
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
+}
+
+// Coerce a Firestore Timestamp | Date | number | null to epoch ms (0 when none).
+// Used only to build the value-history re-read signature. Named tsMillis to stay
+// unique across the Babel global scope (Collection.js already defines `ts`).
+function tsMillis(v) {
+  if (!v) return 0;
+  if (v.toMillis) return v.toMillis();
+  if (v.seconds != null) return v.seconds * 1000;
+  const d = new Date(v);
+  return isNaN(d) ? 0 : d.getTime();
 }
 
 // ---- mount ----
