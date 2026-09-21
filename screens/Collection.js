@@ -10,6 +10,14 @@ CV.Collection = function Collection(props) {
   const [sport, setSport] = useState("all"); // "all" | sport value
   const [gradedOnly, setGradedOnly] = useState(false);
   const [sort, setSort] = useState("date"); // date | value | year | player
+  const [reanalyzeAsk, setReanalyzeAsk] = useState(false); // "Analyze all" cost guard
+
+  // "Un-analyzed" = no AI pass yet (aiSuggested absent/null). Computed in memory
+  // from the already-loaded cards — no query change, no index (spec §6).
+  const unanalyzedCount = useMemo(
+    () => cards.filter((c) => c.aiSuggested == null).length,
+    [cards]
+  );
 
   // Which sports actually appear, in the controlled order.
   const presentSports = useMemo(() => {
@@ -60,6 +68,20 @@ CV.Collection = function Collection(props) {
           {/* 30-day delta hidden before Phase 3 */}
         </div>
       </header>
+
+      {/* "Analyze all" banner — only when un-analyzed cards exist. Neutral (never
+          gold): gold is reserved for money + the primary action (spec §4). */}
+      {unanalyzedCount > 0 ? (
+        <button className="ai-banner" onClick={() => setReanalyzeAsk(true)}>
+          <span className="ai-banner-icon">
+            <CV.Icons.Sparkle size={16} />
+          </span>
+          <span className="ai-banner-text">
+            <strong>{unanalyzedCount}</strong> card{unanalyzedCount === 1 ? "" : "s"} need AI
+          </span>
+          <span className="ai-banner-cta">Analyze all</span>
+        </button>
+      ) : null}
 
       {/* Search */}
       <div className="search-wrap">
@@ -127,6 +149,27 @@ CV.Collection = function Collection(props) {
           ))}
         </div>
       )}
+
+      {/* Cost guard: confirm the count + a short cost/time note before the batch. */}
+      <CV.ConfirmDialog
+        open={reanalyzeAsk}
+        title={"Analyze " + unanalyzedCount + " card" + (unanalyzedCount === 1 ? "" : "s") + "?"}
+        message={
+          "Claude reads the front and back of each un-analyzed card and fills in only the blank fields — " +
+          "your existing values are never changed. That's " +
+          unanalyzedCount +
+          " AI vision call" +
+          (unanalyzedCount === 1 ? "" : "s") +
+          " (a few cents each) and usually under a minute. Confident cards apply automatically; anything " +
+          "unsure waits for you to confirm."
+        }
+        confirmLabel="Analyze all"
+        onConfirm={() => {
+          setReanalyzeAsk(false);
+          props.onBulkReanalyze && props.onBulkReanalyze();
+        }}
+        onClose={() => setReanalyzeAsk(false)}
+      />
     </div>
   );
 };

@@ -232,3 +232,9 @@ function ReanalyzeConfirm(props) {
     </div>
   );
 }
+
+// Exposed for the bulk re-analyze review queue (screens/ReanalyzeBulk.js), which
+// reuses this EXACT confirm form for per-row sign-off of check/error rows — same
+// only-empty merge, scoped confidence flags, and edit-save contract. Reusing it
+// keeps the single- and bulk-review paths from drifting.
+CV.ReanalyzeConfirm = ReanalyzeConfirm;
