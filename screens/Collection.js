@@ -31,7 +31,11 @@ CV.Collection = function Collection(props) {
       if (sport !== "all" && c.sport !== sport) return false;
       if (gradedOnly && !c.graded) return false;
       if (q) {
-        const hay = [c.player, c.set, c.subset, c.team, (c.additionalPlayers || []).join(" ")]
+        const hay = [
+          c.player, c.set, c.subset, c.team, c.brand, c.parallel, c.cardNumber,
+          c.year != null ? String(c.year) : "",
+          (c.additionalPlayers || []).join(" "),
+        ]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -90,7 +94,7 @@ CV.Collection = function Collection(props) {
           className="search-input"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search player, set, year…"
+          placeholder="Search player, team, set, brand, year, card #…"
         />
         {query ? (
           <button className="search-clear" onClick={() => setQuery("")} aria-label="Clear">

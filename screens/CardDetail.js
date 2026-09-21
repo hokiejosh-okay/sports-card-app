@@ -14,6 +14,7 @@ CV.CardDetail = function CardDetail(props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteErr, setDeleteErr] = useState("");
 
   // "Update value" affordance (spec §11 Phase 2).
   const [valueOpen, setValueOpen] = useState(false);
@@ -25,6 +26,7 @@ CV.CardDetail = function CardDetail(props) {
   useEffect(() => {
     setNotes(card.notes || "");
     setSide("front");
+    setDeleteErr("");
   }, [card.id]);
 
   const img = card.photos && card.photos[side] ? card.photos[side].url : null;
@@ -47,12 +49,15 @@ CV.CardDetail = function CardDetail(props) {
 
   async function doDelete() {
     setDeleting(true);
+    setDeleteErr("");
     try {
       await CV.deleteCard(card);
       props.onDeleted && props.onDeleted();
     } catch (e) {
+      // Same inline pattern as the value/save errors — no browser alert.
       setDeleting(false);
-      alert("Delete failed: " + (e.message || e));
+      setConfirmDelete(false);
+      setDeleteErr("Delete failed. Check your connection and try again.");
     }
   }
 
@@ -111,6 +116,7 @@ CV.CardDetail = function CardDetail(props) {
                 className="menu-item menu-danger"
                 onClick={() => {
                   setMenuOpen(false);
+                  setDeleteErr("");
                   setConfirmDelete(true);
                 }}
               >
@@ -122,6 +128,8 @@ CV.CardDetail = function CardDetail(props) {
       </header>
 
       <div className="detail-body">
+        {deleteErr ? <div className="form-error">{deleteErr}</div> : null}
+
         {/* Image + flip */}
         <div className={"detail-img-wrap" + (isGraded ? " detail-slab" : "")}>
           {isGraded ? (
