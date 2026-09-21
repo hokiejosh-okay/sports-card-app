@@ -93,6 +93,7 @@ CV.BulkUpload = function BulkUpload(props) {
     setUploading(true);
     setStage("queue");
     const uid = CV.auth.currentUser.uid;
+    const batchId = "batch-" + Date.now(); // one id for the whole batch (#3), not per row
     let done = 0;
     try {
       await CV.ai.runPool(
@@ -103,7 +104,7 @@ CV.BulkUpload = function BulkUpload(props) {
           const back = await CV.uploadCardImage(uid, id, "back", pair.back.fullBlob, pair.back.thumbBlob);
           await CV.createIntake(id, {
             ownerId: uid,
-            batchId: "batch-" + Date.now(),
+            batchId: batchId,
             sequence: i,
             photos: { front, back },
             status: "uploaded", // the onCreate Function analyzes it server-side

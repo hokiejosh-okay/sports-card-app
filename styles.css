@@ -440,6 +440,25 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
   .grid { grid-template-columns: 1fr 1fr 1fr; }
 }
 
+/* Collection mobile rhythm (known-issue #18). Phone widths only, so desktop
+   (≥560px, the 3-up grid above) is untouched. Keeps the .screen 16px side
+   gutter; tightens vertical rhythm and lifts the sport chips to a ≥44px
+   touch target. */
+@media (max-width: 559px) {
+  .collection .home-total {
+    font-size: 36px;
+    /* A long total can't push the page wider than the viewport. */
+    overflow-wrap: anywhere;
+  }
+  .collection .search-wrap { margin: 10px 0 8px; }
+  .collection .filter-row { gap: 8px; padding: 4px 0 10px; }
+  .collection .filter-row .chip { min-height: 44px; padding: 10px 15px; }
+  .collection .sort-row { margin-bottom: 10px; }
+  /* minmax(0,…) lets a tile's nowrap text (value, set line) shrink instead of
+     forcing the track wider than the viewport on narrow phones. */
+  .collection .grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+}
+
 /* ========== Phase 1: AI intake + bulk seeding ========== */
 
 /* confidence flags (spec §4: low-confidence fields get a gold check tag) */
