@@ -9,7 +9,8 @@ CV.Collection = function Collection(props) {
   const [query, setQuery] = useState("");
   const [sport, setSport] = useState("all"); // "all" | sport value
   const [gradedOnly, setGradedOnly] = useState(false);
-  const [sort, setSort] = useState("date"); // date | value | year | player
+  const [sort, setSort] = useState("date"); // date | value | gain | year | player
+  const [dir, setDir] = useState("desc"); // asc | desc — applies to every sort key
   const [reanalyzeAsk, setReanalyzeAsk] = useState(false); // "Analyze all" cost guard
 
   // "Un-analyzed" = no AI pass yet (aiSuggested absent/null). Computed in memory
@@ -44,15 +45,22 @@ CV.Collection = function Collection(props) {
       return true;
     });
 
+    // In-memory sort (spec §6). Every card yields a {has, val} for the active
+    // sort key: cards WITHOUT a value for that key (blank value/year, unmatched
+    // gain, empty player) always sort LAST, in BOTH directions — the direction
+    // toggle only reorders the cards that do have a value.
     list = list.slice().sort((a, b) => {
-      if (sort === "value") return (num(b.estimatedValue)) - (num(a.estimatedValue));
-      if (sort === "year") return (num(b.year)) - (num(a.year));
-      if (sort === "player") return String(a.player || "").localeCompare(String(b.player || ""));
-      // date added (newest first) — createdAt may be a Timestamp
-      return ts(b.createdAt) - ts(a.createdAt);
+      const A = sortKey(a, sort);
+      const B = sortKey(b, sort);
+      if (A.has !== B.has) return A.has ? -1 : 1; // blanks always last
+      if (!A.has) return 0;
+      let cmp;
+      if (typeof A.val === "string") cmp = A.val.localeCompare(B.val);
+      else cmp = A.val - B.val;
+      return dir === "asc" ? cmp : -cmp;
     });
     return list;
-  }, [cards, query, sport, gradedOnly, sort]);
+  }, [cards, query, sport, gradedOnly, sort, dir]);
 
   const totals = CV.fmt.collectionTotals(cards);
   // 30-day header delta from the loaded value histories (spec §5, Phase 3). The
@@ -146,9 +154,19 @@ CV.Collection = function Collection(props) {
           <select className="sort-select" value={sort} onChange={(e) => setSort(e.target.value)}>
             <option value="date">Date added</option>
             <option value="value">Value</option>
+            <option value="gain">Gain vs. paid</option>
             <option value="year">Year</option>
             <option value="player">Player</option>
           </select>
+          <button
+            type="button"
+            className="sort-dir"
+            onClick={() => setDir((d) => (d === "asc" ? "desc" : "asc"))}
+            aria-label={dir === "asc" ? "Sorted ascending — tap to sort descending" : "Sorted descending — tap to sort ascending"}
+            title={dir === "asc" ? "Ascending" : "Descending"}
+          >
+            {dir === "asc" ? "↑" : "↓"}
+          </button>
         </label>
       </div>
 
@@ -202,10 +220,25 @@ function EmptyState(props) {
   );
 }
 
-function num(v) {
-  const n = Number(v);
-  return isNaN(n) ? -Infinity : n;
+// Accessor for the active sort key → { has, val }. `has:false` means the card
+// has no value for this key and must sort LAST in either direction (spec §6).
+function sortKey(c, sort) {
+  const hasNum = (v) => v != null && v !== "" && !isNaN(Number(v));
+  if (sort === "value") return hasNum(c.estimatedValue) ? { has: true, val: Number(c.estimatedValue) } : { has: false };
+  if (sort === "year") return hasNum(c.year) ? { has: true, val: Number(c.year) } : { has: false };
+  if (sort === "gain") {
+    const g = CV.fmt.cardGain(c); // null unless the card has BOTH value and paid
+    return g != null ? { has: true, val: g } : { has: false };
+  }
+  if (sort === "player") {
+    const p = String(c.player || "").trim();
+    return p ? { has: true, val: p.toLowerCase() } : { has: false };
+  }
+  // date added — createdAt may be a Timestamp
+  const t = ts(c.createdAt);
+  return t ? { has: true, val: t } : { has: false };
 }
+
 function ts(v) {
   if (!v) return 0;
   if (v.toMillis) return v.toMillis();
