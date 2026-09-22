@@ -163,10 +163,29 @@ CV.BulkUpload = function BulkUpload(props) {
     }
   }
 
+  // Skip = drop the card from the review queue but KEEP the intake doc for
+  // AI-accuracy data (KB issue #4). Delete ONLY the Storage images (the review
+  // queue no longer needs them) and mark the row status:"discarded" — that value
+  // is already in the validIntake enum and already excluded from BULK_ACTIVE, so
+  // the row leaves the queue and never reappears (no rules change, no phantom
+  // row). Deliberately NOT CV.deleteIntakeAndImages, which also deletes the doc.
+  // Scope: the bulk review queue only — single-add / re-analyze paths are unchanged.
+  async function discardRow(row) {
+    const p = (row && row.photos) || {};
+    const paths = [];
+    ["front", "back"].forEach((side) => {
+      const s = p[side] || {};
+      if (s.path) paths.push(s.path);
+      if (s.thumbPath) paths.push(s.thumbPath);
+    });
+    await Promise.all(paths.map((path) => CV.storage.ref(path).delete().catch(() => {})));
+    await CV.updateIntake(row.id, { status: "discarded" });
+  }
+
   async function skipRow(row) {
     setBusyRowId(row.id);
     try {
-      await CV.deleteIntakeAndImages(row);
+      await discardRow(row);
     } finally {
       setBusyRowId(null);
     }
@@ -222,7 +241,9 @@ CV.BulkUpload = function BulkUpload(props) {
     const row = confirmRow;
     setConfirmRow(null);
     try {
-      await CV.deleteIntakeAndImages(row);
+      // Same discard semantics as the per-row Skip (KB issue #4): keep the doc,
+      // delete images, mark discarded.
+      await discardRow(row);
     } catch (e) {
       /* non-fatal */
     }
