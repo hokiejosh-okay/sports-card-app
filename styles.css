@@ -593,5 +593,7 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 .chart-bar-value { fill: var(--muted); font-family: var(--font-mono); font-size: 11px; }
 
 /* CSV export — the screen's primary action */
+.clear-intake { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.clear-intake .btn { align-self: flex-start; }
 .insights-export { margin: 26px 0 10px; display: flex; flex-direction: column; gap: 8px; align-items: center; text-align: center; }
 .insights-export .btn { width: 100%; max-width: 340px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }

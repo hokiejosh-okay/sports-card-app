@@ -7,8 +7,39 @@
 window.CV = window.CV || {};
 
 CV.Insights = function Insights(props) {
+  const { useState, useEffect, useCallback } = React;
   const cards = props.cards || [];
   const histories = props.histories || {};
+
+  // "Clear confirmed intake" (PRD §14): confirmed bulk-upload rows have served
+  // their purpose. Count them once (queried by ownerId only, filtered in memory
+  // — no composite index); the control below deletes the docs (never photos).
+  const [confirmedCount, setConfirmedCount] = useState(0);
+  const [clearAsk, setClearAsk] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
+  const refreshConfirmed = useCallback(() => {
+    const u = CV.auth && CV.auth.currentUser;
+    if (!u) return;
+    CV.countConfirmedIntake(u.uid).then((n) => setConfirmedCount(n), () => {});
+  }, []);
+
+  useEffect(() => { refreshConfirmed(); }, [refreshConfirmed]);
+
+  async function doClearConfirmed() {
+    const u = CV.auth && CV.auth.currentUser;
+    if (!u) return;
+    setClearing(true);
+    try {
+      await CV.clearConfirmedIntake(u.uid);
+      refreshConfirmed();
+    } catch (e) {
+      /* non-fatal; count refresh below reflects reality */
+    } finally {
+      setClearing(false);
+      setClearAsk(false);
+    }
+  }
 
   const totals = CV.fmt.collectionTotals(cards);
   const costBasis = CV.fmt.costBasis(cards);
@@ -114,6 +145,24 @@ CV.Insights = function Insights(props) {
         )}
       </div>
 
+      {/* Clear confirmed intake (PRD §14) — maintenance, shown only when there's
+          something to clear. Neutral action (never gold); deletes intake docs
+          only, never card photos. */}
+      {confirmedCount > 0 ? (
+        <div className="insights-section">
+          <div className="section-head">Bulk upload cleanup</div>
+          <div className="clear-intake">
+            <div className="stat-note">
+              {confirmedCount} confirmed intake row{confirmedCount === 1 ? "" : "s"} left from bulk
+              uploads. Clearing removes only this bookkeeping — your cards and their photos are untouched.
+            </div>
+            <button className="btn btn-ghost" onClick={() => setClearAsk(true)}>
+              Clear confirmed intake
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {/* CSV export — the screen's primary action (gold, spec §4). Exports ALL
           cards regardless of the Collection filters. */}
       <div className="insights-export">
@@ -128,6 +177,19 @@ CV.Insights = function Insights(props) {
           {cards.length} card{cards.length === 1 ? "" : "s"} · opens in Excel or Google Sheets
         </div>
       </div>
+
+      <CV.ConfirmDialog
+        open={clearAsk}
+        title={"Clear " + confirmedCount + " confirmed intake row" + (confirmedCount === 1 ? "" : "s") + "?"}
+        message={
+          "This deletes the bulk-upload bookkeeping for cards you've already confirmed. Your cards and " +
+          "their photos are NOT affected, and re-analyze rows are left alone."
+        }
+        confirmLabel="Clear"
+        busy={clearing}
+        onConfirm={doClearConfirmed}
+        onClose={() => setClearAsk(false)}
+      />
     </div>
   );
 };
