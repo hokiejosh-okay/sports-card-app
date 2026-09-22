@@ -46,6 +46,7 @@ CV.Insights = function Insights(props) {
   const gain = CV.fmt.unrealizedGain(cards); // { gain, matched, count }
   const mover = CV.fmt.bestMover(cards);
   const sports = CV.fmt.sportBreakdown(cards);
+  const aiAcc = CV.fmt.aiAccuracy(cards); // { analyzed, fields:[{key,match,total,rate}] }
   const series = CV.fmt.collectionValueSeries(cards, histories, 6);
   // Drop leading months with no recorded value yet so the line starts where the
   // history actually begins (has is monotonic once true), rather than drawing a
@@ -145,6 +146,37 @@ CV.Insights = function Insights(props) {
         )}
       </div>
 
+      {/* AI accuracy (PRD §7) — read-only, computed in memory from the aiSuggested
+          already stored on each card. No writes, no new reads. */}
+      <div className="insights-section">
+        <div className="section-head">AI accuracy</div>
+        {aiAcc.analyzed > 0 ? (
+          <React.Fragment>
+            <div className="ai-acc-list">
+              {aiAcc.fields.map((f) => {
+                const pct = Math.round(f.rate * 100);
+                return (
+                  <div className="ai-acc-row" key={f.key}>
+                    <span className="ai-acc-field">{AI_FIELD_LABELS[f.key] || f.key}</span>
+                    <span className="ai-acc-bar"><span style={{ width: pct + "%" }} /></span>
+                    <span className="ai-acc-pct">{pct}%</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="stat-note">
+              How often Claude's original suggestion matched what you saved, across {aiAcc.analyzed}{" "}
+              analyzed card{aiAcc.analyzed === 1 ? "" : "s"}. Normalized fields (sport, brand) can differ
+              from the raw suggestion even when the read was correct.
+            </div>
+          </React.Fragment>
+        ) : (
+          <div className="chart-empty">
+            No AI-analyzed cards yet. Capture cards with AI and their accuracy shows up here.
+          </div>
+        )}
+      </div>
+
       {/* Clear confirmed intake (PRD §14) — maintenance, shown only when there's
           something to clear. Neutral action (never gold); deletes intake docs
           only, never card photos. */}
@@ -192,4 +224,19 @@ CV.Insights = function Insights(props) {
       />
     </div>
   );
+};
+
+// Display labels for the AI-accuracy fields (module scope — unique name across
+// the shared Babel global scope).
+const AI_FIELD_LABELS = {
+  player: "Player",
+  year: "Year",
+  brand: "Brand",
+  set: "Set",
+  subset: "Subset",
+  cardNumber: "Card #",
+  parallel: "Parallel",
+  serialNumber: "Serial #",
+  sport: "Sport",
+  graded: "Graded",
 };
