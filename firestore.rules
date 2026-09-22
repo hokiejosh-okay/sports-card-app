@@ -37,7 +37,21 @@ service cloud.firestore {
           && d.player is string && d.player.size() > 0
           && d.sport in ['baseball','basketball','football','hockey','soccer','golf','wrestling','mma-boxing','racing','other']
           && d.graded is bool
-          && (d.graded == false || (d.grading.company is string && d.grading.grade is number));
+          // Controlled lists (spec §5) — enforced WHEN PRESENT so older docs that
+          // predate a field aren't made uneditable by the whole-doc update rule.
+          // Values must match data/lists.js exactly (case included).
+          // brand: any of the controlled brands, incl "Other".
+          && (!('brand' in d) || d.brand in ['Topps','Panini','Upper Deck','Bowman','Fleer','Donruss','Leaf','Score','Other'])
+          // condition: a controlled condition, or null (graded cards and older raw cards).
+          //   parallel is intentionally NOT constrained (free-entry by design).
+          && (!('condition' in d) || d.condition == null
+              || d.condition in ['Gem Mint','Mint','Near Mint-Mint','Near Mint','Excellent','Very Good','Good','Poor'])
+          // When graded: grading.company from the controlled list (incl "Other"),
+          // grade a number 1–10. gradeLabel is free text and is not constrained.
+          && (d.graded == false || (
+                d.grading.company in ['PSA','BGS','SGC','CGC','CSG','HGA','TAG','Other']
+                && d.grading.grade is number && d.grading.grade >= 1 && d.grading.grade <= 10
+             ));
       }
 
       allow read:   if allowlisted() && ownsExisting();

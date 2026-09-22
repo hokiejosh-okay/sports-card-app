@@ -229,6 +229,13 @@ img { max-width: 100%; display: block; }
   border: 1px solid var(--hairline); background: var(--surface); color: var(--ink);
   border-radius: 8px; padding: 6px 8px; font-size: 13px; font-weight: 600;
 }
+/* Asc/desc direction toggle next to the sort select — neutral (never gold). */
+.sort-dir {
+  border: 1px solid var(--hairline); background: var(--surface); color: var(--ink);
+  border-radius: 8px; padding: 6px 9px; font-size: 14px; font-weight: 700;
+  line-height: 1; cursor: pointer;
+}
+.sort-dir:hover { border-color: var(--ink); }
 
 /* ---------- grid + tile ---------- */
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -296,7 +303,19 @@ img { max-width: 100%; display: block; }
 .detail-body { display: flex; flex-direction: column; gap: 16px; }
 .detail-img-wrap { border-radius: var(--radius); overflow: hidden; background: var(--surface-2); border: 1px solid var(--hairline); }
 .detail-slab { border-color: var(--gold-line); }
+.detail-img-stage { position: relative; }
 .detail-img { width: 100%; aspect-ratio: 63 / 88; object-fit: contain; background: var(--surface-2); }
+/* Photo rotation control — neutral, never gold (gold = money + primary action). */
+.rotate-btn {
+  position: absolute; top: 8px; right: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 999px;
+  border: 1px solid var(--hairline); background: var(--surface); color: var(--ink);
+  box-shadow: var(--shadow); cursor: pointer;
+}
+.rotate-btn:hover { border-color: var(--ink); }
+.rotate-btn:disabled { opacity: 0.55; cursor: default; }
+.rotate-err { margin: 8px 0 0; }
 .flip-tabs { display: flex; border-top: 1px solid var(--hairline); }
 .flip-tab { flex: 1; border: none; background: var(--surface); color: var(--muted); padding: 10px; font-weight: 600; font-size: 13px; }
 .flip-on { color: var(--ink); background: var(--surface-2); }
@@ -586,5 +605,15 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 .chart-bar-value { fill: var(--muted); font-family: var(--font-mono); font-size: 11px; }
 
 /* CSV export — the screen's primary action */
+/* AI accuracy panel (PRD §7) — neutral bars, never gold. */
+.ai-acc-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.ai-acc-row { display: grid; grid-template-columns: 84px 1fr 44px; align-items: center; gap: 10px; }
+.ai-acc-field { font-size: 13px; color: var(--ink); }
+.ai-acc-bar { height: 8px; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 999px; overflow: hidden; }
+.ai-acc-bar > span { display: block; height: 100%; background: var(--ink); border-radius: 999px; }
+.ai-acc-pct { font-family: var(--font-mono); font-size: 12px; color: var(--muted); text-align: right; }
+
+.clear-intake { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.clear-intake .btn { align-self: flex-start; }
 .insights-export { margin: 26px 0 10px; display: flex; flex-direction: column; gap: 8px; align-items: center; text-align: center; }
 .insights-export .btn { width: 100%; max-width: 340px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }

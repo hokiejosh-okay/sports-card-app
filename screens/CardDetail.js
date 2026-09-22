@@ -9,6 +9,12 @@ CV.CardDetail = function CardDetail(props) {
   const card = props.card;
 
   const [side, setSide] = useState("front");
+  // Photo rotation (spec §3). imgBust holds a freshly-rotated, cache-busted URL
+  // per side so an overwritten Storage object (same download token) still shows
+  // the rotated image immediately, without a hard reload.
+  const [rotating, setRotating] = useState(false);
+  const [rotateErr, setRotateErr] = useState("");
+  const [imgBust, setImgBust] = useState({});
   const [notes, setNotes] = useState(card.notes || "");
   const [notesState, setNotesState] = useState("idle"); // idle | saving | saved
   const [menuOpen, setMenuOpen] = useState(false);
@@ -27,9 +33,51 @@ CV.CardDetail = function CardDetail(props) {
     setNotes(card.notes || "");
     setSide("front");
     setDeleteErr("");
+    setRotateErr("");
+    setImgBust({});
   }, [card.id]);
 
-  const img = card.photos && card.photos[side] ? card.photos[side].url : null;
+  // Displayed source: prefer a freshly-rotated cache-busted URL for this side.
+  const storedUrl = card.photos && card.photos[side] ? card.photos[side].url : null;
+  const img = imgBust[side] || storedUrl;
+
+  // Rotate the CURRENTLY VISIBLE side 90° CW: re-encode full + thumb from a
+  // rotated canvas, re-upload to the SAME Storage paths, then write the full
+  // photos map back (replacing only this side's url/thumbUrl, keeping both paths
+  // and the other side intact) so the rules' whole-doc validation still passes.
+  async function rotateSide() {
+    if (rotating) return;
+    const cur = (card.photos && card.photos[side]) || {};
+    const srcUrl = imgBust[side] || cur.url;
+    if (!srcUrl) return;
+    setRotating(true);
+    setRotateErr("");
+    try {
+      const { fullBlob, thumbBlob } = await CV.images.rotate(srcUrl, 90);
+      const uid = CV.auth.currentUser.uid;
+      const uploaded = await CV.uploadCardImage(uid, card.id, side, fullBlob, thumbBlob);
+      const p = card.photos || {};
+      const nextSide = Object.assign({}, p[side] || {}, {
+        url: uploaded.url,
+        thumbUrl: uploaded.thumbUrl,
+      });
+      const nextPhotos = Object.assign({}, p, { [side]: nextSide });
+      await CV.updateCard(card.id, { photos: nextPhotos });
+      // Overwriting a Storage object can keep the same download token, so the
+      // <img> src would be byte-identical and the browser would serve the cached
+      // (un-rotated) image. Cache-bust the freshly returned URL to force a reload.
+      const busted = uploaded.url + (uploaded.url.indexOf("?") >= 0 ? "&" : "?") + "r=" + Date.now();
+      setImgBust((m) => Object.assign({}, m, { [side]: busted }));
+    } catch (e) {
+      setRotateErr(
+        e && e.name === "SecurityError"
+          ? "Couldn't rotate — the image bucket is blocking canvas access (CORS). One-time fix needed on the Storage bucket."
+          : (e && e.message) || "Couldn't rotate the image. Try again."
+      );
+    } finally {
+      setRotating(false);
+    }
+  }
   const isGraded = !!card.graded;
   // eBay sold-comps deep links, built live from the card's current attributes so
   // they stay correct even for cards saved before compsUrl existed (spec §8).
@@ -143,11 +191,26 @@ CV.CardDetail = function CardDetail(props) {
               {card.grading && card.grading.gradeLabel ? " · " + card.grading.gradeLabel : ""}
             </div>
           ) : null}
-          {img ? (
-            <img src={img} alt={card.player + " " + side} className="detail-img" />
-          ) : (
-            <div className="detail-img placeholder">No image</div>
-          )}
+          <div className="detail-img-stage">
+            {img ? (
+              <img src={img} alt={card.player + " " + side} className="detail-img" />
+            ) : (
+              <div className="detail-img placeholder">No image</div>
+            )}
+            {img ? (
+              <button
+                type="button"
+                className="rotate-btn"
+                onClick={rotateSide}
+                disabled={rotating}
+                aria-label={"Rotate " + side + " 90 degrees"}
+                title="Rotate 90°"
+              >
+                <CV.Icons.Rotate size={18} />
+              </button>
+            ) : null}
+          </div>
+          {rotateErr ? <div className="form-error rotate-err">{rotateErr}</div> : null}
           <div className="flip-tabs">
             <button className={"flip-tab" + (side === "front" ? " flip-on" : "")} onClick={() => setSide("front")}>
               Front

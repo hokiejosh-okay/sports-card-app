@@ -7,14 +7,46 @@
 window.CV = window.CV || {};
 
 CV.Insights = function Insights(props) {
+  const { useState, useEffect, useCallback } = React;
   const cards = props.cards || [];
   const histories = props.histories || {};
+
+  // "Clear confirmed intake" (PRD §14): confirmed bulk-upload rows have served
+  // their purpose. Count them once (queried by ownerId only, filtered in memory
+  // — no composite index); the control below deletes the docs (never photos).
+  const [confirmedCount, setConfirmedCount] = useState(0);
+  const [clearAsk, setClearAsk] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
+  const refreshConfirmed = useCallback(() => {
+    const u = CV.auth && CV.auth.currentUser;
+    if (!u) return;
+    CV.countConfirmedIntake(u.uid).then((n) => setConfirmedCount(n), () => {});
+  }, []);
+
+  useEffect(() => { refreshConfirmed(); }, [refreshConfirmed]);
+
+  async function doClearConfirmed() {
+    const u = CV.auth && CV.auth.currentUser;
+    if (!u) return;
+    setClearing(true);
+    try {
+      await CV.clearConfirmedIntake(u.uid);
+      refreshConfirmed();
+    } catch (e) {
+      /* non-fatal; count refresh below reflects reality */
+    } finally {
+      setClearing(false);
+      setClearAsk(false);
+    }
+  }
 
   const totals = CV.fmt.collectionTotals(cards);
   const costBasis = CV.fmt.costBasis(cards);
   const gain = CV.fmt.unrealizedGain(cards); // { gain, matched, count }
   const mover = CV.fmt.bestMover(cards);
   const sports = CV.fmt.sportBreakdown(cards);
+  const aiAcc = CV.fmt.aiAccuracy(cards); // { analyzed, fields:[{key,match,total,rate}] }
   const series = CV.fmt.collectionValueSeries(cards, histories, 6);
   // Drop leading months with no recorded value yet so the line starts where the
   // history actually begins (has is monotonic once true), rather than drawing a
@@ -114,6 +146,55 @@ CV.Insights = function Insights(props) {
         )}
       </div>
 
+      {/* AI accuracy (PRD §7) — read-only, computed in memory from the aiSuggested
+          already stored on each card. No writes, no new reads. */}
+      <div className="insights-section">
+        <div className="section-head">AI accuracy</div>
+        {aiAcc.analyzed > 0 ? (
+          <React.Fragment>
+            <div className="ai-acc-list">
+              {aiAcc.fields.map((f) => {
+                const pct = Math.round(f.rate * 100);
+                return (
+                  <div className="ai-acc-row" key={f.key}>
+                    <span className="ai-acc-field">{AI_FIELD_LABELS[f.key] || f.key}</span>
+                    <span className="ai-acc-bar"><span style={{ width: pct + "%" }} /></span>
+                    <span className="ai-acc-pct">{pct}%</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="stat-note">
+              How often Claude's original suggestion matched what you saved, across {aiAcc.analyzed}{" "}
+              analyzed card{aiAcc.analyzed === 1 ? "" : "s"}. Normalized fields (sport, brand) can differ
+              from the raw suggestion even when the read was correct.
+            </div>
+          </React.Fragment>
+        ) : (
+          <div className="chart-empty">
+            No AI-analyzed cards yet. Capture cards with AI and their accuracy shows up here.
+          </div>
+        )}
+      </div>
+
+      {/* Clear confirmed intake (PRD §14) — maintenance, shown only when there's
+          something to clear. Neutral action (never gold); deletes intake docs
+          only, never card photos. */}
+      {confirmedCount > 0 ? (
+        <div className="insights-section">
+          <div className="section-head">Bulk upload cleanup</div>
+          <div className="clear-intake">
+            <div className="stat-note">
+              {confirmedCount} confirmed intake row{confirmedCount === 1 ? "" : "s"} left from bulk
+              uploads. Clearing removes only this bookkeeping — your cards and their photos are untouched.
+            </div>
+            <button className="btn btn-ghost" onClick={() => setClearAsk(true)}>
+              Clear confirmed intake
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {/* CSV export — the screen's primary action (gold, spec §4). Exports ALL
           cards regardless of the Collection filters. */}
       <div className="insights-export">
@@ -128,6 +209,34 @@ CV.Insights = function Insights(props) {
           {cards.length} card{cards.length === 1 ? "" : "s"} · opens in Excel or Google Sheets
         </div>
       </div>
+
+      <CV.ConfirmDialog
+        open={clearAsk}
+        title={"Clear " + confirmedCount + " confirmed intake row" + (confirmedCount === 1 ? "" : "s") + "?"}
+        message={
+          "This deletes the bulk-upload bookkeeping for cards you've already confirmed. Your cards and " +
+          "their photos are NOT affected, and re-analyze rows are left alone."
+        }
+        confirmLabel="Clear"
+        busy={clearing}
+        onConfirm={doClearConfirmed}
+        onClose={() => setClearAsk(false)}
+      />
     </div>
   );
+};
+
+// Display labels for the AI-accuracy fields (module scope — unique name across
+// the shared Babel global scope).
+const AI_FIELD_LABELS = {
+  player: "Player",
+  year: "Year",
+  brand: "Brand",
+  set: "Set",
+  subset: "Subset",
+  cardNumber: "Card #",
+  parallel: "Parallel",
+  serialNumber: "Serial #",
+  sport: "Sport",
+  graded: "Graded",
 };
