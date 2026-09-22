@@ -303,7 +303,19 @@ img { max-width: 100%; display: block; }
 .detail-body { display: flex; flex-direction: column; gap: 16px; }
 .detail-img-wrap { border-radius: var(--radius); overflow: hidden; background: var(--surface-2); border: 1px solid var(--hairline); }
 .detail-slab { border-color: var(--gold-line); }
+.detail-img-stage { position: relative; }
 .detail-img { width: 100%; aspect-ratio: 63 / 88; object-fit: contain; background: var(--surface-2); }
+/* Photo rotation control — neutral, never gold (gold = money + primary action). */
+.rotate-btn {
+  position: absolute; top: 8px; right: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 999px;
+  border: 1px solid var(--hairline); background: var(--surface); color: var(--ink);
+  box-shadow: var(--shadow); cursor: pointer;
+}
+.rotate-btn:hover { border-color: var(--ink); }
+.rotate-btn:disabled { opacity: 0.55; cursor: default; }
+.rotate-err { margin: 8px 0 0; }
 .flip-tabs { display: flex; border-top: 1px solid var(--hairline); }
 .flip-tab { flex: 1; border: none; background: var(--surface); color: var(--muted); padding: 10px; font-weight: 600; font-size: 13px; }
 .flip-on { color: var(--ink); background: var(--surface-2); }
