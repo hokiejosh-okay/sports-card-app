@@ -43,13 +43,17 @@ CV.lists = {
     "Excellent", "Very Good", "Good", "Poor",
   ],
 
-  // flags — booleans, each individually queryable
+  // flags — booleans, each individually queryable. The ONE source for flag keys,
+  // labels and the canonical order (form toggles, badges, CSV columns).
+  //   limited = short print OR any serial-numbered card
+  //   jersey  = any jersey/patch swatch (incl. multi-color patches)
+  //   relic   = non-jersey memorabilia only (bat, ball, glove, base, ticket…)
   flags: [
-    { key: "rookie", label: "RC" },
-    { key: "auto", label: "Auto" },
+    { key: "rookie", label: "Rookie" },
+    { key: "autograph", label: "Autograph" },
+    { key: "limited", label: "Limited" },
+    { key: "jersey", label: "Jersey" },
     { key: "relic", label: "Relic" },
-    { key: "patch", label: "Patch" },
-    { key: "shortPrint", label: "SP" },
   ],
 
   // valueSource
@@ -59,3 +63,23 @@ CV.lists = {
 // Fast membership checks used by validation / display.
 CV.lists.sportValues = CV.lists.sports.map((s) => s.value);
 CV.lists.sportLabel = (v) => (CV.lists.sports.find((s) => s.value === v) || {}).label || v || "";
+
+// Flags in either shape → the current five-key shape. Old shape (pre flag
+// categories) was { rookie, auto, relic, patch, shortPrint }, where relic meant
+// ANY memorabilia — so every old relic/patch becomes Jersey and old relic is
+// dropped. Used everywhere flags are READ (form, badges, CSV, comps, AI mapping)
+// and by the one-time CV.migrateFlags, so old docs, old intake rows and old
+// model output all display correctly. Missing keys = false.
+CV.normalizeFlags = function (flags) {
+  const f = flags || {};
+  const isNew = "autograph" in f || "limited" in f || "jersey" in f;
+  const pick = (v, fallback) => (v != null ? !!v : !!fallback);
+  return {
+    rookie: !!f.rookie,
+    autograph: pick(f.autograph, f.auto),
+    limited: pick(f.limited, f.shortPrint),
+    // In a new-shape map, relic means non-jersey memorabilia, so it never feeds jersey.
+    jersey: pick(f.jersey, isNew ? f.patch : f.relic || f.patch),
+    relic: isNew ? !!f.relic : false,
+  };
+};

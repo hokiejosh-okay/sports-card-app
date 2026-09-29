@@ -5,13 +5,12 @@ CV.BadgeRow = function BadgeRow(props) {
   const card = props.card;
   const badges = [];
 
-  if (card.flags) {
-    if (card.flags.rookie) badges.push({ t: "RC", cls: "badge badge-rc" });
-    if (card.flags.auto) badges.push({ t: "Auto", cls: "badge" });
-    if (card.flags.relic) badges.push({ t: "Relic", cls: "badge" });
-    if (card.flags.patch) badges.push({ t: "Patch", cls: "badge" });
-    if (card.flags.shortPrint) badges.push({ t: "SP", cls: "badge" });
-  }
+  // Flags in canonical order with full names, read through the normalizer so
+  // old-shape docs display correctly (data/lists.js is the one source).
+  const flags = CV.normalizeFlags(card.flags);
+  CV.lists.flags.forEach((f) => {
+    if (flags[f.key]) badges.push({ t: f.label, cls: "badge" + (f.key === "rookie" ? " badge-rc" : "") });
+  });
   if (card.parallel && card.parallel !== "Base") badges.push({ t: card.parallel, cls: "badge badge-parallel" });
   if (card.serialNumber) badges.push({ t: "/" + serialDen(card.serialNumber), cls: "badge badge-serial" });
 

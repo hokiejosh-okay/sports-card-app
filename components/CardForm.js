@@ -34,7 +34,7 @@ function blankForm() {
     parallel: "Base",
     cardNumber: "",
     serialNumber: "",
-    flags: { rookie: false, auto: false, relic: false, patch: false, shortPrint: false },
+    flags: CV.normalizeFlags({}),
     graded: false,
     grading: { company: "PSA", grade: "", gradeLabel: "", certNumber: "" },
     condition: "",
@@ -63,7 +63,7 @@ function formFromCard(card) {
     parallel: card.parallel || "Base",
     cardNumber: card.cardNumber || "",
     serialNumber: card.serialNumber || "",
-    flags: Object.assign(f.flags, card.flags || {}),
+    flags: CV.normalizeFlags(card.flags),
     graded: !!card.graded,
     grading: {
       company: g.company || "PSA",
@@ -119,13 +119,9 @@ function assemble(form, uid, photos, ai) {
     cardNumber: strOrNull(form.cardNumber),
     parallel: form.parallel && form.parallel.trim() ? form.parallel.trim() : "Base",
     serialNumber: strOrNull(form.serialNumber),
-    flags: {
-      rookie: !!form.flags.rookie,
-      auto: !!form.flags.auto,
-      relic: !!form.flags.relic,
-      patch: !!form.flags.patch,
-      shortPrint: !!form.flags.shortPrint,
-    },
+    // The complete five-key map, always: flags is saved whole on edit, so any
+    // key not written here would be erased. A numbered card is always Limited.
+    flags: assembleFlags(form.flags, form.serialNumber),
     graded: !!form.graded,
     grading: form.graded
       ? {
@@ -156,6 +152,17 @@ function assemble(form, uid, photos, ai) {
   // save so it always reflects the current parallel/grade (spec §8, §11 Phase 2).
   data.compsUrl = CV.comps.primaryUrl(data);
   return data;
+}
+
+// Normalized flags + the serial→limited rule. Shared by assemble() and the
+// form's locked Limited toggle so the UI shows exactly what will be saved.
+function assembleFlags(flags, serialNumber) {
+  const out = CV.normalizeFlags(flags);
+  if (isNumbered(serialNumber)) out.limited = true;
+  return out;
+}
+function isNumbered(serialNumber) {
+  return !!(serialNumber && String(serialNumber).trim());
 }
 
 // ---- the ONE save path -----------------------------------------------------
@@ -449,6 +456,7 @@ CV.CardForm = function CardForm(props) {
   }
 
   const grades = CV.lists.grades;
+  const numbered = isNumbered(form.serialNumber);
 
   return (
     <div className="cardform">
@@ -553,10 +561,23 @@ CV.CardForm = function CardForm(props) {
           {low("flags") ? <span className="check-tag">check</span> : null}
         </label>
         <div className="toggle-row">
-          {CV.lists.flags.map((f) => (
-            <Toggle key={f.key} label={f.label} on={!!form.flags[f.key]} onClick={() => setFlag(f.key, !form.flags[f.key])} />
-          ))}
+          {CV.lists.flags.map((f) => {
+            // Limited is forced on (and locked) while Serial # has a value; clearing
+            // the serial unlocks it with its own stored state intact.
+            const locked = f.key === "limited" && numbered;
+            return (
+              <Toggle
+                key={f.key}
+                label={f.label}
+                neutral
+                on={locked || !!form.flags[f.key]}
+                disabled={locked}
+                onClick={() => setFlag(f.key, !form.flags[f.key])}
+              />
+            );
+          })}
         </div>
+        {numbered ? <div className="field-hint toggle-hint">Numbered cards are always Limited</div> : null}
       </div>
 
       {/* Graded */}
@@ -696,7 +717,13 @@ function Field(props) {
 
 function Toggle(props) {
   return (
-    <button type="button" className={"toggle" + (props.on ? " toggle-on" : "")} onClick={props.onClick}>
+    <button
+      type="button"
+      className={"toggle" + (props.neutral ? " toggle-neutral" : "") + (props.on ? " toggle-on" : "")}
+      onClick={props.onClick}
+      disabled={props.disabled}
+      aria-pressed={!!props.on}
+    >
       {props.label}
     </button>
   );
