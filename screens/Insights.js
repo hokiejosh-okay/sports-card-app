@@ -172,9 +172,16 @@ CV.Insights = function Insights(props) {
           </React.Fragment>
         ) : (
           <div className="chart-empty">
-            No AI-analyzed cards yet. Capture cards with AI and their accuracy shows up here.
+            {aiAcc.excluded > 0
+              ? "No reviewed AI-analyzed cards yet. Review flagged cards in Edit and their accuracy shows up here."
+              : "No AI-analyzed cards yet. Capture cards with AI and their accuracy shows up here."}
           </div>
         )}
+        {aiAcc.excluded > 0 ? (
+          <div className="stat-note ai-acc-excluded">
+            {aiAcc.excluded} card{aiAcc.excluded === 1 ? "" : "s"} excluded — saved without review
+          </div>
+        ) : null}
       </div>
 
       {/* Clear confirmed intake (PRD §14) — maintenance, shown only when there's

@@ -617,3 +617,12 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 .clear-intake .btn { align-self: flex-start; }
 .insights-export { margin: 26px 0 10px; display: flex; flex-direction: column; gap: 8px; align-items: center; text-align: center; }
 .insights-export .btn { width: 100%; max-width: 340px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+
+/* Bulk Save all: leftover-row reasons, card-detail "AI unsure" note, and the
+   AI-accuracy excluded count. Deliberately neutral (never --accent). */
+.queue-reason { color: var(--muted); font-size: 12px; font-weight: 600; margin-top: 2px; white-space: normal; }
+.ai-unsure-note { background: var(--surface-2); border: 1px solid var(--hairline); border-radius: var(--radius-sm); color: var(--muted); font-size: 13px; padding: 8px 10px; margin-bottom: 10px; }
+.ai-acc-excluded { margin-top: 6px; }
+/* The row's title is a <button>, which otherwise keeps the UA's black text in
+   dark mode; inherit the theme ink so leftover rows read in both themes. */
+.queue-main { color: inherit; }

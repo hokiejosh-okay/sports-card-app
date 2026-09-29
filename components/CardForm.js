@@ -207,6 +207,16 @@ CV.saveCardFromForm = async function (mode, existingCard, form, photos, opts) {
     delete data.aiConfidence;
   }
 
+  // A human save through this form in edit mode (EditCard, single/bulk
+  // re-analyze confirm) IS the review, so it clears the "AI unsure" flag that
+  // bulk Save all may have set. FieldValue.delete() removes the key entirely,
+  // so a reviewed card looks exactly like a confidently-saved one (absent =
+  // reviewed). Deleting an absent field is a no-op. Headless writes (notes,
+  // rotation, Update value, saveReanalyzeFromAI) never touch aiUnreviewed.
+  if (mode === "edit") {
+    data.aiUnreviewed = firebase.firestore.FieldValue.delete();
+  }
+
   if (mode === "edit") {
     // Don't stomp createdAt on edit.
     await CV.updateCard(cardId, data);
@@ -223,24 +233,56 @@ CV.saveCardFromForm = async function (mode, existingCard, form, photos, opts) {
     }
   }
 
-  return Object.assign({ id: cardId }, data);
+  const saved = Object.assign({ id: cardId }, data);
+  if (mode === "edit") delete saved.aiUnreviewed; // don't hand the delete sentinel to callers
+  return saved;
 };
 
-// ---- headless save from an analyzed intake row (bulk "Confirm all ready") --
+// ---- headless save from an analyzed intake row (bulk "Save all") -----------
+// The form + photos an analyzed intake row would save as — the same mapping
+// saveCardFromAI uses, exposed so the bulk queue can decide eligibility with
+// CV.validateCard before it saves (one mapping, no fork of the save path).
+function formFromAIRow(row) {
+  const p = (row && row.photos) || {};
+  return {
+    form: formFromCard(CV.ai.fieldsToCard((row && row.aiSuggested) || {}, p)),
+    photos: {
+      front: Object.assign({}, p.front, { stored: p.front, dirty: false }),
+      back: Object.assign({}, p.back, { stored: p.back, dirty: false }),
+    },
+  };
+}
+CV.validateAIRow = function (row) {
+  const x = formFromAIRow(row);
+  return CV.validateCard(x.form, x.photos);
+};
+
+// Fields the model rated "low" on an intake row (keys of aiConfidence).
+CV.lowConfidenceKeys = function (aiConfidence) {
+  const c = aiConfidence || {};
+  return Object.keys(c).filter((k) => c[k] === "low");
+};
+
 // Uses the same assemble + validation as the form, so a queue-confirmed card is
 // identical to a hand-confirmed one (spec §6). Throws if required fields are
 // missing so the caller can leave the row for manual review.
-CV.saveCardFromAI = async function (row) {
+// opts.flagLowConfidence (bulk "Save all" only): when the row has any "low"
+// confidence keys, also write top-level aiUnreviewed: [those keys] so the card
+// can be reviewed later. A confident row writes nothing extra; callers that
+// omit opts get exactly the old behavior.
+CV.saveCardFromAI = async function (row, opts) {
+  opts = opts || {};
   const uid = CV.auth.currentUser.uid;
-  const cardData = CV.ai.fieldsToCard(row.aiSuggested || {}, row.photos);
-  const form = formFromCard(cardData);
-  const photos = {
-    front: Object.assign({}, row.photos.front, { stored: row.photos.front, dirty: false }),
-    back: Object.assign({}, row.photos.back, { stored: row.photos.back, dirty: false }),
-  };
+  const x = formFromAIRow(row);
+  const form = x.form;
+  const photos = x.photos;
   const v = CV.validateCard(form, photos);
   if (!v.ok) throw new Error("needs-review");
   const data = assemble(form, uid, photos, { aiSuggested: row.aiSuggested, aiConfidence: row.aiConfidence });
+  if (opts.flagLowConfidence) {
+    const low = CV.lowConfidenceKeys(row.aiConfidence);
+    if (low.length) data.aiUnreviewed = low;
+  }
   await CV.createCard(row.id, data);
   // Seed value history if the intake carried a value (spec §5, §11 Phase 2).
   if (data.estimatedValue != null && !isNaN(Number(data.estimatedValue))) {

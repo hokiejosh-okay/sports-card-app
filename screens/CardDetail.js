@@ -295,6 +295,14 @@ CV.CardDetail = function CardDetail(props) {
         {/* Details spec list */}
         <div className="detail-section">
           <div className="section-head">Details</div>
+          {/* Bulk "Save all" saved this card with low-confidence AI fields nobody
+              has checked yet (aiUnreviewed). Neutral, never gold; cleared by a
+              save in Edit. */}
+          {Array.isArray(card.aiUnreviewed) && card.aiUnreviewed.length ? (
+            <div className="ai-unsure-note">
+              AI unsure: {card.aiUnreviewed.map(CV.fmt.aiFieldLabel).join(", ")} — review in Edit
+            </div>
+          ) : null}
           <dl className="spec-list">
             <Spec label="Sport" value={CV.lists.sportLabel(card.sport)} />
             <Spec label="Team" value={card.team} />
