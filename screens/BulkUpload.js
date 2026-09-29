@@ -2,8 +2,9 @@
 // Flow: select many photos (shot front, back, front, back…) → pair by sequence
 // (offset + remove to fix slips) → upload → a resumable Firestore review queue
 // (ready / check / working / error) that the analyzeIntake Function fills
-// server-side, with Confirm-all-ready, per-row open→confirm, Retry, Skip,
-// Swap sides, and Re-pair.
+// server-side, with Save all (ready + low-confidence-only rows, the latter
+// flagged aiUnreviewed), per-row open→confirm, Retry, Skip, Swap sides, and
+// Re-pair.
 window.CV = window.CV || {};
 
 const BULK_ACTIVE = ["uploaded", "analyzing", "ready", "check", "error"];
@@ -27,10 +28,18 @@ CV.BulkUpload = function BulkUpload(props) {
   const [uploadMsg, setUploadMsg] = useState("");
   const [rows, setRows] = useState([]);
   const [confirmRow, setConfirmRow] = useState(null);
-  const [confirmingAll, setConfirmingAll] = useState(false);
   const [busyRowId, setBusyRowId] = useState(null);
   const [err, setErr] = useState("");
   const bootRef = useRef(false);
+  // Save all: dialog summary, loop progress, and a ref lock so a double tap or
+  // a re-render mid-loop can never start a second pass over the same rows.
+  const [saveAllSummary, setSaveAllSummary] = useState(null); // { total, confident, low, attention, working }
+  const [saveProgress, setSaveProgress] = useState(null); // { done, total } while the loop runs
+  const savingRef = useRef(false);
+  // Latest rows/cards for the loop, which outlives the render it started in.
+  const rowsRef = useRef([]);
+  const cardsRef = useRef(props.cards || []);
+  cardsRef.current = props.cards || [];
 
   // Resumable queue: listen to the user's active intake rows (spec §11).
   useEffect(() => {
@@ -44,6 +53,7 @@ CV.BulkUpload = function BulkUpload(props) {
           // phantom card and Skip would delete the real card's images.
           .filter((r) => BULK_ACTIVE.indexOf(r.status) >= 0 && !r.reanalyzeOf)
           .sort((a, b) => tsms(a.createdAt) - tsms(b.createdAt) || (a.sequence || 0) - (b.sequence || 0));
+        rowsRef.current = active;
         setRows(active);
         if (!bootRef.current) {
           bootRef.current = true;
@@ -131,30 +141,89 @@ CV.BulkUpload = function BulkUpload(props) {
   }
 
   // ---- queue actions ----
-  async function confirmAllReady() {
-    const ready = rows.filter((r) => r.status === "ready");
-    if (!ready.length) return;
-    setConfirmingAll(true);
-    for (const row of ready) {
-      try {
-        // Duplicate suggestion (§2): don't silently merge — leave it for review.
-        const cand = dupCandidate(row);
-        if (CV.findDuplicates(cand, props.cards).length) {
-          await CV.updateIntake(row.id, { status: "check" });
+  // Save all (replaces "Confirm all ready"). Eligibility is decided per row from
+  // its CURRENT data (bulkRowPlan), not from status alone: ready rows plus check
+  // rows whose only problem is low confidence. Side mismatches, duplicates,
+  // validation failures and error rows stay in the queue with a reason.
+  function summarizeSaveAll(list, cards) {
+    const sum = { total: 0, confident: 0, low: 0, attention: 0, working: 0 };
+    list.forEach((r) => {
+      const plan = bulkRowPlan(r, cards);
+      if (plan.kind === "confident" || plan.kind === "low") {
+        sum.total += 1;
+        sum[plan.kind] += 1;
+      } else sum[plan.kind] += 1;
+    });
+    return sum;
+  }
+
+  function openSaveAll() {
+    if (savingRef.current) return;
+    const sum = summarizeSaveAll(rowsRef.current, cardsRef.current);
+    if (!sum.total) return;
+    setSaveAllSummary(sum);
+  }
+
+  async function runSaveAll() {
+    if (savingRef.current) return; // busy lock: never two loops
+    savingRef.current = true;
+    setSaveAllSummary(null);
+    setErr("");
+    const confirmedIds = {};
+    try {
+      // Snapshot the eligible ids now; each row is re-checked from current data
+      // right before its save.
+      const ids = rowsRef.current
+        .filter((r) => {
+          const k = bulkRowPlan(r, cardsRef.current).kind;
+          return k === "confident" || k === "low";
+        })
+        .map((r) => r.id);
+      const savedThisRun = []; // so two copies in one batch still count as duplicates
+      setSaveProgress({ done: 0, total: ids.length });
+      for (let i = 0; i < ids.length; i++) {
+        setSaveProgress({ done: i + 1, total: ids.length });
+        const row = rowsRef.current.find((r) => r.id === ids[i]);
+        if (!row) continue; // skipped or re-paired meanwhile
+        const cards = cardsRef.current.concat(savedThisRun);
+        const plan = bulkRowPlan(row, cards);
+        if (plan.kind !== "confident" && plan.kind !== "low") continue; // stays with its reason
+        try {
+          // Card id = intake id, so a card that already exists (an earlier save
+          // whose bookkeeping didn't land) is never written twice — just close
+          // the row.
+          if (!plan.alreadySaved) {
+            if (typeof navigator !== "undefined" && navigator.onLine === false) throw new Error("offline");
+            const saved = await bulkWithTimeout(CV.saveCardFromAI(row, { flagLowConfidence: true }), 25000);
+            savedThisRun.push(saved);
+          }
+        } catch (e) {
+          // Leave the row in the queue for a look; don't await (offline-safe —
+          // the local write updates the listener immediately) and keep going.
+          CV.updateIntake(row.id, { status: "check", saveError: bulkSaveErrorReason(e) }).catch(() => {});
           continue;
         }
-        await CV.saveCardFromAI(row);
-        await CV.updateIntake(row.id, { status: "confirmed", cardId: row.id });
-      } catch (e) {
-        await CV.updateIntake(row.id, { status: "check" }).catch(() => {});
+        try {
+          await bulkWithTimeout(CV.updateIntake(row.id, { status: "confirmed", cardId: row.id, saveError: null }), 15000);
+          confirmedIds[row.id] = true;
+        } catch (e) {
+          /* card is saved; the row shows "Already saved" and the next Save all closes it */
+        }
       }
+    } finally {
+      savingRef.current = false;
+      setSaveProgress(null);
     }
-    setConfirmingAll(false);
+    // Empty active queue → back to Collection; otherwise stay so leftovers show
+    // their reasons. Decided from what this run confirmed, not a stale render.
+    const left = rowsRef.current.filter((r) => !confirmedIds[r.id]);
+    if (!left.length) props.onDone();
   }
 
   async function retryRow(row) {
     setBusyRowId(row.id);
     try {
+      if (row.saveError) CV.updateIntake(row.id, { saveError: null }).catch(() => {}); // stale once re-read
       await CV.callAnalyzeIntake(row.id);
     } catch (e) {
       /* listener surfaces the error status */
@@ -199,6 +268,7 @@ CV.BulkUpload = function BulkUpload(props) {
         status: "uploaded",
         photos: { front: row.photos.back, back: row.photos.front },
         sideCheck: null,
+        saveError: null,
       });
       await CV.callAnalyzeIntake(row.id);
     } catch (e) {
@@ -284,7 +354,12 @@ CV.BulkUpload = function BulkUpload(props) {
   if (stage === "queue") {
     const total = rows.length;
     const analyzed = rows.filter((r) => ["ready", "check", "error"].indexOf(r.status) >= 0).length;
-    const readyCount = rows.filter((r) => r.status === "ready").length;
+    const plans = {};
+    rows.forEach((r) => {
+      plans[r.id] = bulkRowPlan(r, props.cards);
+    });
+    const saveCount = rows.filter((r) => plans[r.id].kind === "confident" || plans[r.id].kind === "low").length;
+    const saving = !!saveProgress;
     const pct = total ? Math.round((analyzed / total) * 100) : 0;
 
     return (
@@ -306,11 +381,17 @@ CV.BulkUpload = function BulkUpload(props) {
                 <div className="queue-progress-label">{analyzed} of {total} analyzed</div>
               </div>
               <div className="queue-actions">
-                <button className="btn btn-primary btn-sm" onClick={confirmAllReady} disabled={confirmingAll || readyCount === 0}>
-                  {confirmingAll ? "Confirming…" : "Confirm all ready (" + readyCount + ")"}
-                </button>
-                <button className="btn btn-ghost btn-sm" onClick={rePair}>Re-pair</button>
-                <button className="btn btn-ghost btn-sm" onClick={() => setStage("select")}>Add more</button>
+                {saving ? (
+                  <button className="btn btn-primary btn-sm" disabled>
+                    Saving {saveProgress.done} of {saveProgress.total}…
+                  </button>
+                ) : saveCount > 0 ? (
+                  <button className="btn btn-primary btn-sm" onClick={openSaveAll}>
+                    Save all ({saveCount})
+                  </button>
+                ) : null}
+                <button className="btn btn-ghost btn-sm" onClick={rePair} disabled={saving}>Re-pair</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setStage("select")} disabled={saving}>Add more</button>
               </div>
             </div>
 
@@ -319,7 +400,8 @@ CV.BulkUpload = function BulkUpload(props) {
                 <QueueRow
                   key={r.id}
                   row={r}
-                  busy={busyRowId === r.id}
+                  reason={plans[r.id].reason}
+                  busy={saving || busyRowId === r.id}
                   onOpen={() => setConfirmRow(r)}
                   onRetry={() => retryRow(r)}
                   onSkip={() => skipRow(r)}
@@ -331,8 +413,17 @@ CV.BulkUpload = function BulkUpload(props) {
         )}
 
         <div className="form-actions">
-          <button className="btn btn-ghost" onClick={props.onDone}>Done</button>
+          <button className="btn btn-ghost" onClick={props.onDone} disabled={saving}>Done</button>
         </div>
+
+        <CV.ConfirmDialog
+          open={!!saveAllSummary}
+          title="Save all"
+          message={saveAllSummary ? saveAllMessage(saveAllSummary) : ""}
+          confirmLabel={saveAllSummary ? "Save " + saveAllSummary.total : "Save"}
+          onConfirm={runSaveAll}
+          onClose={() => setSaveAllSummary(null)}
+        />
       </div>
     );
   }
@@ -443,6 +534,88 @@ function dupCandidate(row) {
   };
 }
 
+// Save all eligibility for one queue row, decided from its current data (not
+// status alone). kind: "working" (uploaded/analyzing — ignored this pass),
+// "confident" | "low" (will be saved; low = has low-confidence keys, flagged
+// aiUnreviewed), or "attention" (stays in the queue). reason is the short
+// neutral line the row shows; a failed save's saveError wins for check rows.
+function bulkRowPlan(row, cards) {
+  const st = row.status;
+  if (st === "uploaded" || st === "analyzing") return { kind: "working", reason: "" };
+  if (st === "error") return { kind: "attention", reason: "Analysis failed" };
+  if (st !== "ready" && st !== "check") return { kind: "working", reason: "" };
+
+  const alreadySaved = (cards || []).some((c) => c.id === row.id);
+  if (alreadySaved) {
+    // An earlier save landed but the row wasn't closed; Save all just closes it.
+    return { kind: "confident", reason: "Already saved — Save all will close it", alreadySaved: true };
+  }
+  const sc = row.sideCheck;
+  if (!sc || sc.frontLooksLikeFront === false || sc.backLooksLikeBack === false) {
+    return { kind: "attention", reason: "Sides may be swapped" };
+  }
+  let v;
+  try {
+    v = CV.validateAIRow(row);
+  } catch (e) {
+    v = { ok: false, errors: {} };
+  }
+  if (!v.ok) {
+    const er = v.errors || {};
+    let reason = "Needs review";
+    if (er.player || er.sport) reason = "Needs player/sport";
+    else if (er.front || er.back) reason = "Missing a photo";
+    else if (er.gradingCompany || er.gradingGrade) reason = "Needs grade";
+    else if (er.year) reason = "Check year";
+    return { kind: "attention", reason: reason };
+  }
+  if (CV.findDuplicates(dupCandidate(row), cards).length) {
+    return { kind: "attention", reason: "Possible duplicate" };
+  }
+  const low = CV.lowConfidenceKeys(row.aiConfidence);
+  return { kind: low.length ? "low" : "confident", reason: st === "check" && row.saveError ? row.saveError : "" };
+}
+
+// Short, neutral reason recorded on a row whose save failed.
+function bulkSaveErrorReason(e) {
+  const code = (e && e.code) || "";
+  const msg = (e && e.message) || "";
+  if (msg === "needs-review") return "Needs review";
+  if (msg === "offline") return "Offline — try again when connected";
+  if (msg === "timeout") return "Timed out — check your connection";
+  if (code === "permission-denied") return "Database rejected it — check condition/grade";
+  if (code === "unavailable" || code === "deadline-exceeded") return "Network error — try again";
+  return ("Save failed" + (msg ? ": " + msg : "")).slice(0, 80);
+}
+
+// Reject if a Firestore write hasn't been acknowledged in `ms` (offline writes
+// otherwise stay pending forever and would stall the Save all loop).
+function bulkWithTimeout(promise, ms) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("timeout")), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}
+
+function saveAllMessage(sum) {
+  const parts = [];
+  if (sum.confident) parts.push(sum.confident + " confident");
+  if (sum.low) parts.push(sum.low + " with low-confidence fields (flagged for review)");
+  let msg = "Save " + sum.total + " card" + (sum.total === 1 ? "" : "s") + ": " + parts.join(", ") + ".";
+  if (sum.attention) msg += " " + sum.attention + (sum.attention === 1 ? " needs" : " need") + " attention and will stay in the queue.";
+  if (sum.working) msg += " " + sum.working + " still analyzing — save " + (sum.working === 1 ? "it" : "them") + " on a later tap.";
+  return msg;
+}
+
 function QueueRow(props) {
   const r = props.row;
   const status = r.status;
@@ -457,9 +630,10 @@ function QueueRow(props) {
       <div className="queue-thumb">
         {thumb ? <img src={thumb} alt="" /> : <div className="queue-thumb-empty" />}
       </div>
-      <button className="queue-main" onClick={props.onOpen} disabled={working}>
+      <button className="queue-main" onClick={props.onOpen} disabled={working || props.busy}>
         <div className="queue-title">{title}</div>
         <div className="queue-sub">{sub}</div>
+        {props.reason ? <div className="queue-reason">{props.reason}</div> : null}
       </button>
       <div className="queue-side">
         <StatusPill status={status} />
