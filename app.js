@@ -15,6 +15,7 @@ function App() {
 
   const deniedRef = useRef(false);
   const unsubCardsRef = useRef(null);
+  const flagsMigratedRef = useRef(null); // uid whose flags were migrated this session
 
   // Theme → <html data-theme>
   useEffect(() => {
@@ -62,6 +63,15 @@ function App() {
       (list) => {
         setCards(list);
         setCardsLoaded(true);
+        // One-time flag-shape migration, once per session after the first
+        // snapshot. Fire-and-forget; the listener picks up the rewritten docs.
+        if (flagsMigratedRef.current !== theUid) {
+          flagsMigratedRef.current = theUid;
+          CV.migrateFlags(theUid, list).then(
+            (n) => { if (n) console.info("Migrated flags on " + n + " card(s)"); },
+            () => {}
+          );
+        }
       },
       (err) => {
         console.error("cards listener error", err);

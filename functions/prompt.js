@@ -17,7 +17,8 @@ export const LISTS = {
   ],
   gradingCompanies: ["PSA", "BGS", "SGC", "CGC", "CSG", "HGA", "TAG", "Other"],
   conditions: ["Gem Mint", "Mint", "Near Mint-Mint", "Near Mint", "Excellent", "Very Good", "Good", "Poor"],
-  flags: ["rookie", "auto", "relic", "patch", "shortPrint"],
+  // Canonical order; mirrors CV.lists.flags keys in data/lists.js.
+  flags: ["rookie", "autograph", "limited", "jersey", "relic"],
 };
 
 // Confidence keys the model must rate. Coarser than the raw field list on
@@ -40,8 +41,12 @@ Rules:
 - parallel: the specific parallel/finish (e.g. "Silver Prizm", "Gold /10", "Refractor"). Use "Base" when it is the base card and not a parallel. You may return any string, but prefer the suggested names when they apply.
 - cardNumber: the number printed on the card, WITHOUT the leading "#" (e.g. "150", "BDC-25"), or null.
 - serialNumber: the print run if the card is numbered, e.g. "12/99", or null. Look for a hand- or machine-stamped "/N". Capture this explicitly — it strongly affects value.
-- flags: set each boolean true only with on-card evidence — rookie, auto (an on-card or sticker autograph), relic (a jersey/patch/memorabilia swatch — relic covers all memorabilia), patch (a multi-color patch swatch specifically), shortPrint (an SP/SSP marking).
+- flags: five booleans — rookie, autograph, limited, jersey, relic. Set each true only with on-card evidence; otherwise false. One "flags" confidence covers all five.
 - flags.rookie: set true ONLY when the card itself carries rookie evidence — an "RC" logo or shield, the printed words "Rookie Card", "Rated Rookie", or "Draft Pick"/"Draft", a first-year designation such as "1st Bowman", or a recognized rookie-year insert/subset marker. Judge strictly from what is printed on or shown by the card; NEVER infer rookie status from the player's fame, prominence, or apparent age. If there is no such on-card marker, set rookie false and rate its confidence "low".
+- flags.autograph: true ONLY when a signature is visible on the card (on-card or sticker autograph) or the card carries an on-card autograph marking (e.g. "Certified Autograph", "Auto"). Never infer from the player or set.
+- flags.limited: true when a serial number is printed or stamped on the card (e.g. "12/99" — then also fill serialNumber), OR when there is explicit short-print evidence on the card (an SP/SSP code or marking). NEVER infer it from the player's or set's popularity.
+- flags.jersey: true for a jersey or patch swatch of any kind (including multi-color patches), or when the card states it contains jersey, patch or uniform material.
+- flags.relic: true ONLY for a memorabilia piece that is NOT jersey material — e.g. bat, ball, glove, base, or ticket. A jersey/patch/uniform swatch is jersey, not relic. If there is clearly a memorabilia piece but you cannot tell what it is, set jersey true (relic false) and rate flags confidence "low".
 - graded: true only if the card is inside a numbered grading slab (PSA/BGS/SGC/etc.). When graded, read grading.company, grading.grade (numeric, e.g. 9 or 9.5), grading.gradeLabel (e.g. "GEM MT", "MINT", "Black Label", or null) and grading.certNumber (the cert/serial on the slab label, or null). When NOT graded, set graded false and every grading.* field to null, and set condition only if you can judge it.
 - condition: for RAW cards only, your best read of the hobby condition; null when graded or unclear.
 - additionalPlayers: other players pictured on a multi-player card; [] otherwise.
@@ -84,10 +89,10 @@ const fieldsSchema = objOf({
   serialNumber: strOrNull,
   flags: objOf({
     rookie: { type: "boolean" },
-    auto: { type: "boolean" },
+    autograph: { type: "boolean" },
+    limited: { type: "boolean" },
+    jersey: { type: "boolean" },
     relic: { type: "boolean" },
-    patch: { type: "boolean" },
-    shortPrint: { type: "boolean" },
   }),
   graded: { type: "boolean" },
   grading: objOf({
