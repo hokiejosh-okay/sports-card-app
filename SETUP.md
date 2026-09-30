@@ -157,6 +157,27 @@ Notes:
   Anthropic rate limits and bound cost.
 - First analysis after a deploy can take a few extra seconds (cold start).
 
+## 9. Phase 4 — auto price lookup (The Card API) — PowerShell
+
+```powershell
+# 1. Get a free key at https://thecardapi.com (no card needed; 5,000 sales rows/UTC day, 3-day lookback).
+# 2. Store it as a Functions secret (paste when prompted). Never in code or the client:
+firebase functions:secrets:set CARD_API_KEY
+
+# 3. Install deps and deploy the Functions + the rules (sales subcollection, system/ lock-down):
+cd functions; npm install; cd ..
+firebase deploy --only functions,firestore:rules
+```
+
+- The deploy creates `refreshCardPrice` (callable) and `refreshValues`
+  (scheduled, 3am America/New_York). Scheduled functions need **Cloud Scheduler**
+  enabled on the project — the first deploy offers to enable it; confirm in
+  Google Cloud console → Cloud Scheduler that job `firebase-schedule-refreshValues-us-central1` exists.
+- Daily usage and the last nightly run are in Firestore `system/priceUsage`
+  (server-only). Tunables are the constants at the top of `functions/pricing.js`.
+- To try it once without waiting for 3am: Cloud Scheduler → the job → **Force run**,
+  or tap **Refresh price** on a card.
+
 ## What's built in Phase 0
 
 Google sign-in + allowlist · full `cards` data model + rules · client-side image
@@ -170,7 +191,7 @@ graded-value link row, manual value entry + value history) are also built.
 Phase 2 is frontend-only — the comps links are client-side eBay URLs (spec §8),
 so no backend deploy is needed beyond the static files.
 
-**Not yet (later phases):** Insights + charts + CSV (Phase 3), automated pricing
-(Phase 4).
+Phase 3 (Insights + charts + CSV) and Phase 4 (automated market pricing via
+The Card API — section 9) are built too.
 
 See `README.md` for the Phase 0 "Done when" checklist and how each item was met.

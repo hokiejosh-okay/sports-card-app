@@ -20,6 +20,10 @@ CV.Collection = function Collection(props) {
     [cards]
   );
 
+  // Phase 4: manual values the market disagrees with (CV.fmt.priceDiffers) —
+  // derived in memory on every snapshot, never stored.
+  const differsCount = useMemo(() => CV.fmt.priceDiffersCards(cards).length, [cards]);
+
   // Which sports actually appear, in the controlled order.
   const presentSports = useMemo(() => {
     const set = new Set(cards.map((c) => c.sport).filter(Boolean));
@@ -103,6 +107,19 @@ CV.Collection = function Collection(props) {
             <strong>{unanalyzedCount}</strong> card{unanalyzedCount === 1 ? "" : "s"} need AI
           </span>
           <span className="ai-banner-cta">Analyze all</span>
+        </button>
+      ) : null}
+
+      {/* Market-price banner (Phase 4) — same neutral treatment as "Analyze all". */}
+      {differsCount > 0 ? (
+        <button className="ai-banner price-banner" onClick={props.onReviewPrices}>
+          <span className="ai-banner-icon">
+            <CV.Icons.Insights size={16} />
+          </span>
+          <span className="ai-banner-text">
+            <strong>{differsCount}</strong> card{differsCount === 1 ? "" : "s"} priced differently from the market
+          </span>
+          <span className="ai-banner-cta">Review</span>
         </button>
       ) : null}
 

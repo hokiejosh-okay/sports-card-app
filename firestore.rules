@@ -64,6 +64,20 @@ service cloud.firestore {
         allow read, write: if allowlisted()
           && get(/databases/$(database)/documents/cards/$(cardId)).data.ownerId == request.auth.uid;
       }
+
+      // Phase 4: matched market sales from The Card API. Written only by the
+      // price Functions (Admin SDK bypasses rules); the owner may read them.
+      match /sales/{saleId} {
+        allow read: if allowlisted()
+          && get(/databases/$(database)/documents/cards/$(cardId)).data.ownerId == request.auth.uid;
+        allow write: if false;
+      }
+    }
+
+    // ---- system (Phase 4) — server-only bookkeeping (system/priceUsage: the
+    // daily Card API sales budget). No client access; Functions use the Admin SDK.
+    match /system/{docId} {
+      allow read, write: if false;
     }
 
     // ---- intake (Phase 1) — the resumable AI-seeding queue (spec §5) ----

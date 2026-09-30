@@ -1,4 +1,5 @@
-// app.js — root component: auth + allowlist, routing, theme, tab bar, card data.
+// app.js — root component: auth + allowlist, routing (incl. the Phase 4
+// priceReview view), theme, tab bar, card data.
 window.CV = window.CV || {};
 
 const { useState, useEffect, useRef } = React;
@@ -94,6 +95,12 @@ function App() {
     setSelectedId(card.id);
     setView({ name: "detail" });
   };
+  // Phase 4: the market-price review list; a card opened from it returns there.
+  const goPriceReview = () => setView({ name: "priceReview" });
+  const openCardFromReview = (card) => {
+    setSelectedId(card.id);
+    setView({ name: "detail", from: "priceReview" });
+  };
   const editCard = (card) => {
     setSelectedId(card.id);
     setView({ name: "edit" });
@@ -179,6 +186,7 @@ function App() {
         onOpen={openCard}
         onAdd={goAdd}
         onBulkReanalyze={goReanalyzeBulk}
+        onReviewPrices={goPriceReview}
         onToggleTheme={toggleTheme}
         theme={theme}
       />
@@ -192,6 +200,8 @@ function App() {
         onDone={goCollection}
       />
     );
+  } else if (view.name === "priceReview") {
+    body = <CV.PriceReview cards={cards} onBack={goCollection} onOpen={openCardFromReview} />;
   } else if (view.name === "insights") {
     body = <CV.Insights cards={cards} histories={histories} onOpen={openCard} />;
   } else if (view.name === "add") {
@@ -201,7 +211,7 @@ function App() {
       <CV.CardDetail
         card={selectedCard}
         history={histories[selectedCard.id] || []}
-        onBack={goCollection}
+        onBack={view.from === "priceReview" ? goPriceReview : goCollection}
         onEdit={editCard}
         onReanalyze={reanalyzeCard}
         onDeleted={goCollection}
