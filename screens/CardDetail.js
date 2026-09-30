@@ -1,7 +1,8 @@
 // screens/CardDetail.js — card detail (spec §3): image flip, badges, value bar with
-// the value-vs-paid delta, eBay sold-comps link + graded-value link row + the
-// "update value" affordance (spec §8, §11 Phase 2), details, autosaving notes,
-// edit, and delete.
+// the value-vs-paid delta, the Phase 4 "Market price" block (The Card API median,
+// Refresh price, differs chip), eBay sold-comps link + graded-value link row
+// (with market values per grade) + the "update value" affordance (spec §8, §11
+// Phase 2), details, autosaving notes, edit, and delete.
 window.CV = window.CV || {};
 
 CV.CardDetail = function CardDetail(props) {
@@ -82,6 +83,7 @@ CV.CardDetail = function CardDetail(props) {
   // eBay sold-comps deep links, built live from the card's current attributes so
   // they stay correct even for cards saved before compsUrl existed (spec §8).
   const comps = CV.getComps(card);
+  const ownGradeTerm = CV.comps.gradeTermOf(card);
 
   async function saveNotes() {
     if ((card.notes || "") === notes) return;
@@ -254,6 +256,9 @@ CV.CardDetail = function CardDetail(props) {
             </div>
           </div>
         </div>
+        {/* Market price (Phase 4): The Card API median, refresh, differs chip. */}
+        <MarketPriceBlock card={card} />
+
         {/* Comps + graded-value links + update-value affordance (spec §8, §11 Phase 2) */}
         <div className="value-tools">
           <div className="comps-row">
@@ -268,18 +273,25 @@ CV.CardDetail = function CardDetail(props) {
           <div className="graded-block">
             <div className="graded-block-head">If graded — value by grade</div>
             <div className="graded-links">
-              {comps.gradedLinks.map((g) => (
-                <a key={g.label} className="graded-link" href={g.url} target="_blank" rel="noopener noreferrer">
-                  {g.label}
-                </a>
-              ))}
+              {comps.gradedLinks.map((g) => {
+                // Market value beside each grade (Phase 4): the weekly graded
+                // previews, or the card's own apiValue for its own slab grade.
+                const gv = card.apiGradedValues || {};
+                const mv = gv[g.label] != null ? gv[g.label] : g.label === ownGradeTerm ? card.apiValue : null;
+                return (
+                  <a key={g.label} className="graded-link" href={g.url} target="_blank" rel="noopener noreferrer">
+                    {g.label}
+                    {mv != null && !isNaN(Number(mv)) ? <span className="graded-link-value">{CV.fmt.moneyAuto(mv)}</span> : null}
+                  </a>
+                );
+              })}
             </div>
           </div>
 
           {card.valueUpdatedAt ? (
             <div className="value-updated">
               Value updated {CV.fmt.date(card.valueUpdatedAt)}
-              {card.valueSource ? " · " + card.valueSource : ""}
+              {card.valueSource ? " · " + (card.valueSource === "api" ? "market price" : card.valueSource) : ""}
             </div>
           ) : null}
         </div>
@@ -413,6 +425,130 @@ function Spec(props) {
     <div className="spec-row">
       <dt className="spec-label">{props.label}</dt>
       <dd className={"spec-value" + (props.mono ? " mono" : "")}>{v}</dd>
+    </div>
+  );
+}
+
+// Phase 4 "Market price" block, under the value bar. Shows the Card API median
+// (gold — it's money), "n sales · last sold <date> · <low>–<high>", a "Low
+// sample" tag under PRICE_LOW_SAMPLE sales, the differs chip with "Use market
+// price" / "Keep mine", and a neutral Refresh price button with loading, error
+// and cooldown states. Everything it shows comes from the card doc; the
+// callable writes and the cards listener re-renders.
+function MarketPriceBlock(props) {
+  const { useState, useEffect } = React;
+  const card = props.card;
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [acting, setActing] = useState(""); // "" | "use" | "keep"
+  const [nowMs, setNowMs] = useState(Date.now());
+
+  const left = CV.fmt.refreshCooldownLeft(card, nowMs);
+  const cooling = left > 0;
+  // Tick while cooling down so the label counts down and the button re-enables.
+  useEffect(() => {
+    if (!cooling) return;
+    const t = setInterval(() => setNowMs(Date.now()), 15000);
+    return () => clearInterval(t);
+  }, [cooling, card.id]);
+  useEffect(() => {
+    setErr("");
+    setNowMs(Date.now());
+  }, [card.id]);
+
+  const hasApi = card.apiValue != null && !isNaN(Number(card.apiValue));
+  const looked = !!card.apiValueUpdatedAt;
+  const meta = card.apiValueMeta || {};
+  const n = CV.fmt.apiSampleSize(card);
+  const differs = CV.fmt.priceDiffers(card);
+
+  async function refresh() {
+    if (busy || cooling) return;
+    setBusy(true);
+    setErr("");
+    try {
+      await CV.callRefreshCardPrice(card.id);
+    } catch (e) {
+      const code = String((e && e.code) || "").replace(/^functions\//, "");
+      if (code === "failed-precondition") setErr((e && e.message) || "Refreshed recently — try again shortly.");
+      else if (code === "resource-exhausted") setErr("Today's price lookups are used up. Try again tomorrow.");
+      else if (code === "permission-denied") setErr("You can't refresh this card.");
+      else if (code === "not-found" || code === "unimplemented") setErr("Price lookup isn't set up yet.");
+      else setErr("Couldn't refresh the price. Try again later.");
+    } finally {
+      setBusy(false);
+      setNowMs(Date.now());
+    }
+  }
+
+  async function act(kind) {
+    if (acting) return;
+    setActing(kind);
+    setErr("");
+    try {
+      if (kind === "use") await CV.acceptMarketPrice(card);
+      else await CV.dismissApiValue(card.id, card.apiValue);
+    } catch (e) {
+      setErr("Couldn't save. Check your connection and try again.");
+    } finally {
+      setActing("");
+    }
+  }
+
+  let btnLabel = "Refresh price";
+  if (busy) btnLabel = "Refreshing…";
+  else if (cooling) btnLabel = "Again in " + Math.max(1, Math.ceil(left / 60000)) + " min";
+
+  return (
+    <div className="market-block">
+      <div className="market-head">
+        <span className="market-label">Market price</span>
+        {hasApi && CV.fmt.apiLowSample(card) ? <span className="market-tag">Low sample</span> : null}
+        {differs ? <span className="market-tag market-tag-differs">Differs from yours</span> : null}
+      </div>
+
+      {hasApi ? (
+        <React.Fragment>
+          <div className="market-amount">{CV.fmt.moneyAuto(card.apiValue)}</div>
+          <div className="market-meta">
+            {n} sale{n === 1 ? "" : "s"}
+            {meta.lastSaleAt ? " · last sold " + CV.fmt.date(meta.lastSaleAt) : ""}
+            {meta.low != null && meta.high != null && n > 1
+              ? " · " + CV.fmt.moneyAuto(meta.low) + "–" + CV.fmt.moneyAuto(meta.high)
+              : ""}
+          </div>
+        </React.Fragment>
+      ) : (
+        <div className="market-empty">
+          {looked ? "No recent sales yet" : "Not checked yet — tap Refresh price"}
+        </div>
+      )}
+
+      {differs ? (
+        <div className="market-differs">
+          <div className="market-differs-text">
+            Yours <span className="market-money">{CV.fmt.moneyAuto(card.estimatedValue)}</span> · market{" "}
+            <span className="market-money">{CV.fmt.moneyAuto(card.apiValue)}</span>
+          </div>
+          <div className="market-actions">
+            <button className="btn btn-sm" onClick={() => act("use")} disabled={!!acting}>
+              {acting === "use" ? "Saving…" : "Use market price"}
+            </button>
+            <button className="btn btn-sm btn-ghost" onClick={() => act("keep")} disabled={!!acting}>
+              {acting === "keep" ? "Saving…" : "Keep mine"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {err ? <div className="form-error market-err">{err}</div> : null}
+
+      <div className="market-foot">
+        <span className="market-checked">{looked ? "Checked " + CV.fmt.date(card.apiValueUpdatedAt) : ""}</span>
+        <button className="btn btn-sm btn-refresh" onClick={refresh} disabled={busy || cooling}>
+          <CV.Icons.Refresh size={15} /> {btnLabel}
+        </button>
+      </div>
     </div>
   );
 }

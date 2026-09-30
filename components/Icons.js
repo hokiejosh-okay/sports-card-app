@@ -80,6 +80,13 @@ window.CV = window.CV || {};
       <path key="a" d="M21 12a9 9 0 1 1-2.64-6.36" />,
       <path key="b" d="M21 3v5h-5" />,
     ]),
+    // Refresh — the CardDetail "Refresh price" button (Phase 4). Neutral.
+    Refresh: make([
+      <path key="a" d="M20 11a8 8 0 0 0-14.6-4.5L4 8" />,
+      <path key="b" d="M4 3v5h5" />,
+      <path key="c" d="M4 13a8 8 0 0 0 14.6 4.5L20 16" />,
+      <path key="d" d="M20 21v-5h-5" />,
+    ]),
     // Sparkle — the "Analyze with AI" affordance. Neutral (currentColor), never gold.
     Sparkle: make([
       <path key="a" d="M12 3l1.7 4.9L18.6 10l-4.9 1.7L12 17l-1.7-5.3L5.4 10l4.9-1.7Z" />,

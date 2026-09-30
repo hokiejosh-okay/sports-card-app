@@ -1,6 +1,6 @@
 {
   "name": "cardvault-functions",
-  "description": "Cloud Functions for CardVault (Phase 1: analyzeIntake; Phase 2+: getComps).",
+  "description": "Cloud Functions for CardVault (Phase 1: analyzeIntake; Phase 4: refreshCardPrice + refreshValues).",
   "type": "module",
   "engines": {
     "node": "20"

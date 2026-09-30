@@ -631,3 +631,79 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 /* The row's title is a <button>, which otherwise keeps the UA's black text in
    dark mode; inherit the theme ink so leftover rows read in both themes. */
 .queue-main { color: inherit; }
+
+/* ---------- Phase 4: market price (The Card API) ----------
+   Gold (--accent) only on the money figures; the block, tags, banner and every
+   button stay neutral. Light + dark come from the tokens. */
+.market-block {
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: var(--radius); padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.market-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.market-label {
+  font-family: var(--font-head); font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.5px; font-size: 12px; color: var(--muted); margin-right: auto;
+}
+.market-tag {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+  padding: 3px 8px; border-radius: 10px;
+  background: var(--surface-2); color: var(--muted); border: 1px solid var(--hairline);
+}
+.market-tag-differs { color: var(--ink); border-color: var(--muted); }
+.market-amount {
+  font-family: var(--font-head); font-weight: 600; color: var(--accent);
+  font-size: 24px; line-height: 1.1; font-variant-numeric: tabular-nums;
+}
+.market-meta { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.market-empty { color: var(--muted); font-size: 14px; }
+.market-differs {
+  display: flex; flex-direction: column; gap: 8px; margin-top: 4px;
+  background: var(--surface-2); border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm); padding: 10px;
+}
+.market-differs-text { font-size: 13px; color: var(--ink); }
+.market-money { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+.market-actions { display: flex; gap: 8px; }
+.market-actions .btn { flex: 1; }
+.market-err { margin: 2px 0 0; }
+.market-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 10px; margin-top: 4px; }
+.market-checked { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.btn-refresh { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.graded-link-value {
+  margin-left: 6px; padding-left: 6px; border-left: 1px solid var(--gold-line);
+  font-weight: 700;
+}
+
+/* Market check (screens/PriceReview.js) */
+.pr-intro { color: var(--muted); font-size: 13px; margin: 0 2px 12px; }
+.pr-list { display: flex; flex-direction: column; gap: 10px; }
+.pr-row {
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: var(--radius); padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.pr-main {
+  display: flex; gap: 12px; align-items: flex-start; width: 100%;
+  border: none; background: transparent; color: inherit; padding: 0; text-align: left;
+}
+.pr-thumb {
+  width: 56px; aspect-ratio: 63 / 88; object-fit: cover; flex-shrink: 0;
+  border-radius: 6px; background: var(--surface-2); border: 1px solid var(--hairline);
+}
+.pr-thumb-empty { display: block; }
+.pr-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.pr-player { font-weight: 700; font-size: 15px; }
+.pr-line { color: var(--muted); font-size: 12px; font-family: var(--font-mono); }
+.pr-values { display: flex; gap: 18px; margin-top: 4px; }
+.pr-val { display: flex; flex-direction: column; }
+.pr-val-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+.pr-money {
+  font-family: var(--font-head); font-weight: 600; color: var(--accent);
+  font-size: 20px; font-variant-numeric: tabular-nums;
+}
+.pr-meta { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pr-tag { font-size: 10px; padding: 2px 6px; }
+.pr-err { margin: 0; }
+.pr-actions { display: flex; gap: 8px; }
+.pr-actions .btn { flex: 1; }

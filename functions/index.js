@@ -19,20 +19,32 @@
 // a paid pricing API arrives (Phase 4) its key stays server-side, so getComps
 // can move here — behind onCall + the allowlist, like analyzeIntake — without
 // touching the frontend, exactly as §8 anticipates.
+//
+// Phase 4 (auto price lookup) adds two Functions over The Card API (pricing.js =
+// matcher + median math, refresh.js = API calls + Firestore writes):
+//   • refreshCardPrice — callable; one card on demand (own price + graded
+//     previews), auth + allowlist + card ownership + a 10-minute per-card cooldown.
+//   • refreshValues — scheduled 3am America/New_York; every card oldest-lookup
+//     first through a pool of 3 until DAILY_SALES_BUDGET, then weekly graded
+//     previews. The key is the Secret Manager secret CARD_API_KEY, server-only.
 
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { logger } from "firebase-functions/v2";
 
 import { runAnalysis, isAllowlisted } from "./analyze.js";
+import { refreshCard, runNightly, BudgetError } from "./refresh.js";
+import { REFRESH_COOLDOWN_MS, ON_DEMAND_SALES_CAP } from "./pricing.js";
 
 initializeApp();
 
 const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
 const ANTHROPIC_MODEL = defineString("ANTHROPIC_MODEL", { default: "claude-opus-5" });
+const CARD_API_KEY = defineSecret("CARD_API_KEY");
 const STORAGE_BUCKET = defineString("STORAGE_BUCKET", { default: "sports-card-app-1.firebasestorage.app" });
 
 // Concurrency cap (spec §6, §7): keep at most 3 Claude vision calls in flight
@@ -106,3 +118,67 @@ export const analyzeIntake = onCall(COMMON, async (req) => {
     throw new HttpsError("internal", "Analysis failed: " + ((e && e.message) || "error"));
   }
 });
+
+// ---- Phase 4: auto price lookup (The Card API) ------------------------------
+
+// Refresh one card's market price now. Auth + allowlist + ownership + cooldown
+// are checked before any API call. Runs the card's own query plus the four
+// graded previews (≈50 sales rows at most), under ON_DEMAND_SALES_CAP.
+export const refreshCardPrice = onCall(
+  { region: "us-central1", secrets: [CARD_API_KEY], memory: "256MiB", timeoutSeconds: 120, concurrency: 1, maxInstances: 3 },
+  async (req) => {
+    const uid = req.auth && req.auth.uid;
+    if (!uid) throw new HttpsError("unauthenticated", "Sign in required.");
+    if (!(await isAllowlisted(uid))) throw new HttpsError("permission-denied", "This app is private.");
+
+    const cardId = req.data && req.data.cardId;
+    if (!cardId || typeof cardId !== "string" || cardId.indexOf("/") !== -1) {
+      throw new HttpsError("invalid-argument", "cardId is required.");
+    }
+    const snap = await getFirestore().doc(`cards/${cardId}`).get();
+    if (!snap.exists) throw new HttpsError("not-found", "Card not found.");
+    const card = snap.data();
+    if (card.ownerId !== uid) throw new HttpsError("permission-denied", "Not your card.");
+
+    const last = card.apiValueUpdatedAt && card.apiValueUpdatedAt.toMillis ? card.apiValueUpdatedAt.toMillis() : 0;
+    const wait = last + REFRESH_COOLDOWN_MS - Date.now();
+    if (wait > 0) {
+      throw new HttpsError("failed-precondition", "Refreshed recently — try again in " + Math.ceil(wait / 60000) + " min.", {
+        retryAfterMs: wait,
+      });
+    }
+
+    try {
+      const r = await refreshCard(getFirestore(), CARD_API_KEY.value(), cardId, {
+        primary: true,
+        graded: true,
+        cap: ON_DEMAND_SALES_CAP,
+      });
+      return { ok: true, apiValue: r.apiValue, sampleSize: r.sampleSize || 0, wroteValue: !!r.wroteValue };
+    } catch (e) {
+      if (e instanceof BudgetError || (e && e.status === 429)) {
+        throw new HttpsError("resource-exhausted", "Today's price lookups are used up. Try again tomorrow.");
+      }
+      logger.error(`refreshCardPrice ${cardId} failed`, e);
+      throw new HttpsError("internal", "Price lookup failed. Try again later.");
+    }
+  }
+);
+
+// Nightly refresh. One instance, 540 s; stops at DAILY_SALES_BUDGET and resumes
+// oldest-first the next night.
+export const refreshValues = onSchedule(
+  {
+    schedule: "0 3 * * *",
+    timeZone: "America/New_York",
+    region: "us-central1",
+    secrets: [CARD_API_KEY],
+    memory: "512MiB",
+    timeoutSeconds: 540,
+    maxInstances: 1,
+    retryCount: 0,
+  },
+  async () => {
+    await runNightly(getFirestore(), CARD_API_KEY.value(), isAllowlisted);
+  }
+);
